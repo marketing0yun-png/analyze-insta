@@ -3,6 +3,13 @@
 > 개념 스키마. 실제 마이그레이션 작성 시 Supabase `apply_migration`으로 반영하고 이 문서를 갱신한다.
 > 원칙: **raw(원본 수집) / 가공(분석·리포트) 분리**, 모든 사용자 테이블은 **RLS** 적용.
 
+## ⚠️ 테이블 접두사 규칙 (필수)
+- **이 Supabase 프로젝트는 공용(여러 프로젝트가 `public` 스키마 공유).**
+- 우리가 만드는 **모든 DB 객체에 `analyze_insta_` 접두사**를 붙인다 (소문자).
+  - 테이블뿐 아니라 **enum 타입·함수·트리거·인덱스**도 `public` 네임스페이스를 공유하므로 동일 접두사.
+  - 예: `analyze_insta_tracked_accounts`, `analyze_insta_user_role`(enum), `analyze_insta_handle_new_user()`.
+- 아래 개요/컬럼 설명의 이름은 **가독성을 위해 접두사를 생략**했다. 실제 객체명 = `analyze_insta_` + 이름.
+
 ## 테이블 개요
 | 테이블 | 구분 | 역할 |
 |---|---|---|
