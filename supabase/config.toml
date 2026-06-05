@@ -1,0 +1,21 @@
+# Supabase 로컬 개발 설정 (요약).
+# 전체 옵션은 `supabase init` 시 생성되는 기본 config 참조.
+# project_id 는 `supabase link` 시 실제 ref 로 교체.
+project_id = "meta-trend-analyzer"
+
+[auth]
+enabled = true
+# 익명 로그인 활성화 (Phase 0~). 배포 전 구글 로그인으로 link (Phase 3).
+enable_anonymous_sign_ins = true
+
+[auth.email]
+enable_signup = false
+
+# Phase 3: 구글 OAuth
+# [auth.external.google]
+# enabled = true
+# client_id = "env(GOOGLE_CLIENT_ID)"
+# secret = "env(GOOGLE_CLIENT_SECRET)"
+
+[db]
+major_version = 17

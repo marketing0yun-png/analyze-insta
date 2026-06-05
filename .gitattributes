@@ -1,0 +1,9 @@
+# 저장소는 LF로 정규화 (Windows 체크아웃은 자동 CRLF 변환 가능)
+* text=auto eol=lf
+
+# 바이너리/이미지
+*.png binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
