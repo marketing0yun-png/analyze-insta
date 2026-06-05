@@ -47,6 +47,17 @@
 - **이유:** 매 세션 자동로드 토큰 절약 + 개발 재개 편의.
 - **날짜:** 2026-06-05
 
+## D-010. Phase 0 스택 구현 세부 (착수 시 확정)
+- **결정:** Next.js 16(App Router) + Tailwind v4 + shadcn/ui(new-york, neutral) + Recharts.
+  익명인증은 **클라이언트(`AuthProvider`)에서 1회 `signInAnonymously`**, 세션 갱신은 proxy.
+- **이유/주의:**
+  - Next 16에서 `middleware` 컨벤션 deprecated → **`src/proxy.ts`** 사용.
+  - `lucide-react` v1은 **브랜드 아이콘(Instagram 등) 제거** → 일반 아이콘(`TrendingUp`)으로 대체.
+  - 익명 로그인을 미들웨어가 아닌 클라이언트에서 하는 이유: 크롤러/봇 요청마다 anon 유저가
+    양산되는 것을 피하고, proxy는 세션 유지/갱신만 담당.
+  - **env 미설정에도 앱이 뜨도록 graceful degrade**(proxy·AuthProvider 모두 env 가드).
+- **날짜:** 2026-06-05
+
 ---
 ## 미해결/추후 결정
 - [ ] 로그인 프로바이더 최종 확정(구글 단독 vs 구글+카카오) — 현재 구글 우선 가정.

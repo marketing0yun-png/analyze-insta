@@ -35,7 +35,8 @@
 4. **Phase 4** 서드파티 PoC → 외부 경쟁사 조회수·댓글내용 보강
 
 ## 현재 상태
-- **기획·실현가능성 검토 완료. 코드 미착수.** 문서화 단계.
+- **Phase 0 코드 스캐폴딩 완료(로컬).** Next.js 16 + Supabase + PWA + 초기 스키마/RLS. `npm run build` 통과.
+- 외부 리소스(Supabase 프로젝트·Meta 앱·Vercel) 연결 대기 → env 채우면 익명인증 활성.
 - 다음 작업: `docs/07_ROADMAP.md`의 "다음 할 일" 참조.
 
 ## 작업 규칙
