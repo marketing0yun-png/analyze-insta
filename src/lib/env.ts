@@ -31,20 +31,36 @@ export function getPublicEnv() {
 }
 
 /**
- * 서버 전용 시크릿. **서버 컴포넌트/route/Edge 에서만** 호출할 것.
- * 클라이언트 컴포넌트에서 import 하면 빌드가 깨지도록 server-only 가드를 둔다.
+ * 서버 전용 시크릿 getter. **서버 컴포넌트/route/Edge 에서만** 호출할 것.
+ * 기능별로 분리해 일부 시크릿이 비어 있어도 나머지 경로는 동작하게 한다
+ * (예: Meta 앱 미생성 단계에서도 토큰 입력·암호화·저장 흐름은 검증 가능).
  */
-export function getServerEnv() {
-  return {
-    supabaseServiceRoleKey: required(
-      "SUPABASE_SERVICE_ROLE_KEY",
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    ),
-    metaAppId: required("META_APP_ID", process.env.META_APP_ID),
-    metaAppSecret: required("META_APP_SECRET", process.env.META_APP_SECRET),
-    tokenEncryptionKey: required(
-      "TOKEN_ENCRYPTION_KEY",
-      process.env.TOKEN_ENCRYPTION_KEY
-    ),
-  };
+
+/** service-role 키 — RLS 우회 서버 클라이언트 전용. */
+export function getServiceRoleKey(): string {
+  return required(
+    "SUPABASE_SERVICE_ROLE_KEY",
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+}
+
+/** 토큰 암호화 키 (Vault 미사용 시). 32바이트 base64. */
+export function getTokenEncryptionKey(): string {
+  return required("TOKEN_ENCRYPTION_KEY", process.env.TOKEN_ENCRYPTION_KEY);
+}
+
+/**
+ * Meta 앱 자격증명. **선택적** — 미설정이면 null.
+ * 있으면 appsecret_proof 서명 + 장기 토큰 교환에 사용한다.
+ */
+export function getMetaAppCreds(): { appId: string; appSecret: string } | null {
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.META_APP_SECRET;
+  if (!appId || !appSecret) return null;
+  return { appId, appSecret };
+}
+
+/** Graph API 버전. 미설정 시 기본값. */
+export function getMetaGraphVersion(): string {
+  return process.env.META_GRAPH_VERSION || "v21.0";
 }

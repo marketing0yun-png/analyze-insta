@@ -58,6 +58,24 @@
   - **env 미설정에도 앱이 뜨도록 graceful degrade**(proxy·AuthProvider 모두 env 가드).
 - **날짜:** 2026-06-05
 
+## D-011. 공용 Supabase 프로젝트 재사용 (신규 생성 안 함)
+- **결정:** 전용 프로젝트를 새로 만들지 않고 기존 **"marketing0yun's Project"(`nushcvgafwqosnkzlsrm`)** 를 공유. 모든 객체에 `analyze_insta_` 접두사.
+- **이유:** 동일 오너의 여러 프로젝트가 한 Supabase에 공존(01marketing_*, p02_*, key_* 등). 비용·관리 단순화. 접두사로 네임스페이스 충돌 회피.
+- **주의:** `public` 스키마 공유라 다른 앱과 RLS·확장(pgcrypto) 영향 공유. 마이그레이션 추가 시 접두사 필수.
+- **날짜:** 2026-06-06
+
+## D-012. 토큰 암호화: AES-256-GCM 대칭암호화 (Vault 전 단계)
+- **결정:** Supabase Vault 도입 전까지 `TOKEN_ENCRYPTION_KEY`(32바이트 base64)로 **AES-256-GCM** 암호화. 저장 포맷 `v1:<iv>:<ct>:<tag>`. 복호화·호출은 server-only.
+- **이유:** Vault 설정 전에도 평문 저장 금지 원칙(docs/06 §2) 충족. GCM은 무결성(인증태그) 포함. 운영 키는 Vercel 시크릿으로 분리.
+- **변경 여지:** 추후 Supabase Vault로 이관 가능(포맷 버전 `v1` 으로 마이그레이션 대비).
+- **날짜:** 2026-06-06
+
+## D-013. ig_user_id 추출: /me/accounts 첫 IG 비즈니스 계정 선택
+- **결정:** 토큰 검증 시 `GET /me/accounts?fields=...instagram_business_account{...}` 에서 IG 비즈니스 계정이 연결된 **첫 페이지**를 자동 선택. 여러 개면 개수를 사용자에게 알리되 첫 번째 사용.
+- **이유:** MVP 단순화. 다중 계정 선택 UI는 실제 다계정 사용자 등장 시 추가.
+- **부분 미설정 graceful:** Meta 앱 시크릿 없으면 appsecret_proof·장기토큰 교환만 건너뛰고 토큰 검증·저장은 동작. service-role 없으면 저장 단계서 503 안내.
+- **날짜:** 2026-06-06
+
 ---
 ## 미해결/추후 결정
 - [ ] 로그인 프로바이더 최종 확정(구글 단독 vs 구글+카카오) — 현재 구글 우선 가정.

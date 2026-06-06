@@ -35,8 +35,9 @@
 4. **Phase 4** 서드파티 PoC → 외부 경쟁사 조회수·댓글내용 보강
 
 ## 현재 상태
-- **Phase 0 코드 스캐폴딩 완료(로컬).** Next.js 16 + Supabase + PWA + 초기 스키마/RLS. `npm run build` 통과.
-- 외부 리소스(Supabase 프로젝트·Meta 앱·Vercel) 연결 대기 → env 채우면 익명인증 활성.
+- **Phase 1 착수(로컬).** 토큰 입력/검증→`ig_user_id` 추출→AES-256-GCM 암호화 저장 흐름 구현. `npm run build`/lint 통과.
+- 공용 Supabase(`nushcvgafwqosnkzlsrm`)에 `analyze_insta_*` 테이블 적용. **익명 로그인 ON + service-role 키 입력·검증 완료**.
+- **남은 블로커:** Meta 앱 `META_APP_ID/SECRET`(휴대폰 인증 이슈로 보류). → 토큰 연결 실제 동작 검증은 Meta 재개 후.
 - 다음 작업: `docs/07_ROADMAP.md`의 "다음 할 일" 참조.
 
 ## 작업 규칙
@@ -48,4 +49,6 @@
 ## 빠른 참조
 - Meta API 호출법: `/meta-api` 스킬 또는 `docs/05_META_API.md`
 - 개발 재개 절차: `/dev-resume` 스킬
-- 셋업(처음 환경 구성): `docs/08_SETUP.md`
+- 셋업(처음 환경 구성): `docs/08_SETUP.md` (요약)
+- **Supabase 설정 상세 매뉴얼:** `docs/10_GUIDE_SUPABASE.md`
+- **Meta 설정 상세 매뉴얼(토큰·비즈니스계정·페이지):** `docs/11_GUIDE_META.md`

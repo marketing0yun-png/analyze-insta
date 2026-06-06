@@ -3,9 +3,12 @@
 > 개발 재개 시 **여기 "다음 할 일"부터** 본다. 작업 완료마다 체크박스/상태 갱신.
 
 ## 현재 상태
-🟢 **Phase 0 코드 스캐폴딩 완료(로컬). 외부 리소스 연결 대기.**
-로컬에서 `npm run build` 통과, 루트 상태 대시보드 렌더 확인(익명세션 env 미설정 시 graceful).
-다음: 외부 리소스(Supabase 프로젝트·Meta 앱·Vercel) 생성 → env 채우면 익명인증 활성.
+🟡 **Phase 1 착수 — 토큰 입력/검증·암호화 저장 흐름 구현 완료(로컬). 외부 토글 대기.**
+- 공용 Supabase(`nushcvgafwqosnkzlsrm`, "marketing0yun's Project")에 `analyze_insta_*` 11테이블+RLS 이미 적용 확인.
+- `.env.local` 작성: Supabase URL/anon키 + 생성한 `TOKEN_ENCRYPTION_KEY`. (service-role·Meta 시크릿은 자리표시자)
+- 토큰 연결 흐름(POST `/api/credentials`): 토큰 검증→`ig_user_id` 추출→장기토큰 교환(앱 시크릿 시)→AES-256-GCM 암호화 저장. `npm run build`/lint 통과.
+- **외부 토글:** ① Supabase 익명 로그인 ON ✅(2026-06-07 검증) ② `SUPABASE_SERVICE_ROLE_KEY` 입력 ✅(검증) ③ Meta 앱 생성→`META_APP_ID/SECRET` ⏳(휴대폰 인증 이슈로 보류).
+- 👉 Supabase 인프라(익명인증·토큰 저장)는 준비 완료. **남은 블로커는 Meta 앱/토큰뿐** — 토큰 연결 실제 동작 검증은 Meta 재개 후.
 
 ---
 
@@ -18,13 +21,16 @@
 - [x] env 검증 헬퍼 + `.env.example`, git init + 초기 커밋
 
 **외부 리소스 — 사용자/오너 작업 필요(코드만으론 불가):**
-- [ ] Supabase 프로젝트 생성 → URL/anon/service-role 키를 `.env.local`에 입력
-- [ ] 마이그레이션 적용(`supabase db push` 또는 MCP `apply_migration`) + 익명인증 토글 ON
+- [x] Supabase 프로젝트(공용 `nushcvgafwqosnkzlsrm` 재사용) → URL/anon키 `.env.local` 입력 완료
+- [x] 마이그레이션 적용(공용 프로젝트에 `analyze_insta_*` 테이블 존재 확인됨)
+- [x] **Supabase 익명 로그인 토글 ON** (2026-06-07 검증 — 익명 세션 발급 성공)
+- [x] `SUPABASE_SERVICE_ROLE_KEY` 를 `.env.local` 에 입력 (검증 — RLS 우회 접근 성공)
 - [ ] Vercel 저장소 연결 + 환경변수 등록
-- [ ] Meta 개발자 앱 생성 + 비즈니스 인증 시작(리드타임 김 — 먼저 착수)
+- [ ] Meta 개발자 앱 생성 → `META_APP_ID/SECRET` ⏳ **보류**(휴대폰 인증 이슈, 재개 예정)
 
 ## Phase 1 — 외부계정 공개지표 대시보드 ⭐ MVP 핵심
-- [ ] 토큰 입력/검증 UI → `ig_user_id` 추출·암호화 저장
+- [x] 토큰 입력/검증 UI → `ig_user_id` 추출·암호화 저장
+      (`/api/credentials` POST/GET, `lib/meta/client.ts`, `lib/crypto/token.ts`, `components/credentials/connect-card.tsx`)
 - [ ] 분석 대상(외부 username) + 카테고리 등록 UI
 - [ ] Business Discovery 수집기(Edge Function) + rate limit 모니터링
 - [ ] 지표 계산: 업로드 주기/시간대/빈도, 참여율, 해시태그·포맷 비중
@@ -64,9 +70,11 @@
 ---
 
 ## 다음 할 일 (Next Action)
-> Phase 0 코드 스캐폴딩 완료. 다음 순서:
-> 1. **Supabase 프로젝트 생성** → `.env.local` 채우고 마이그레이션 적용, 익명인증 토글 ON.
->    → 루트 페이지 "익명 인증" 카드가 `연결됨`으로 바뀌는지 확인.
-> 2. **Meta 앱 생성 + 비즈니스 인증 착수**(리드타임 길어 먼저).
-> 3. 확인되면 **Phase 1** 착수: 토큰 입력/검증 UI → `ig_user_id` 추출·암호화 저장.
+> 토큰 연결 흐름까지 구현 완료. 활성화 + 다음 기능:
+> 1. **사용자 토글 3건** (코드 불가):
+>    - Supabase 익명 로그인 ON → 루트 "익명 인증" 카드가 `연결됨`이 되는지 확인.
+>    - `.env.local` 에 `SUPABASE_SERVICE_ROLE_KEY` 입력 (없으면 토큰저장 503).
+>    - Meta 앱 생성 → `META_APP_ID/SECRET` 입력 (없어도 토큰 검증·저장은 동작, 장기토큰 교환·appsecret_proof만 비활성).
+> 2. **연결 검증:** 익명 ON 후 실제 Meta 토큰으로 "검증 후 연결" → `ig_user_id` 추출·저장 확인.
+> 3. **다음 Phase 1 기능:** 분석 대상(외부 username)+카테고리 등록 UI → Business Discovery 수집기(Edge Function).
 > - 로컬 실행: `npm install` → `npm run dev` → http://localhost:3000

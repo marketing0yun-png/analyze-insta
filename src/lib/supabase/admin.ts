@@ -2,7 +2,7 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 
-import { getPublicEnv, getServerEnv } from "@/lib/env";
+import { getPublicEnv, getServiceRoleKey } from "@/lib/env";
 import type { Database } from "@/lib/supabase/types";
 
 /**
@@ -11,7 +11,7 @@ import type { Database } from "@/lib/supabase/types";
  */
 export function createAdminClient() {
   const { supabaseUrl } = getPublicEnv();
-  const { supabaseServiceRoleKey } = getServerEnv();
+  const supabaseServiceRoleKey = getServiceRoleKey();
 
   return createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
     auth: {

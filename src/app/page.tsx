@@ -1,5 +1,6 @@
 import { Activity, TrendingUp } from "lucide-react";
 
+import { ConnectCard } from "@/components/credentials/connect-card";
 import { SetupStatus } from "@/components/setup-status";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -63,8 +64,9 @@ export default function Home() {
         </p>
       </header>
 
-      <section className="mb-8">
+      <section className="mb-8 space-y-3">
         <SetupStatus />
+        <ConnectCard />
       </section>
 
       <section>

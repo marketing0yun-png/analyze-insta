@@ -1,6 +1,8 @@
 # 08. 환경 셋업 절차
 
 > 개발 착수 시 1회성 환경 구성. 완료 항목은 체크.
+> 📖 **단계별 상세 매뉴얼:** Supabase → `docs/10_GUIDE_SUPABASE.md`, Meta → `docs/11_GUIDE_META.md`.
+> (이 문서는 요약 체크리스트, 위 두 문서가 그림·순서 포함 실사용 설명서)
 
 ## 1. Meta 개발자 앱 (리드타임 김 — 가장 먼저)
 - [ ] [developers.facebook.com](https://developers.facebook.com) 앱 생성
