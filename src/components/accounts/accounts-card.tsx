@@ -307,7 +307,8 @@ export function AccountsCard() {
     const est = fmtDuration(targets.length * SEC_PER_ACCOUNT);
     const ok = window.confirm(
       `선택한 ${targets.length}개 계정을 수집하고 AI 분석합니다.\n` +
-        `계정당 약 100~120초 소요 — 예상 총 약 ${est}.\n\n` +
+        `계정당 약 100~120초 소요 — 예상 총 약 ${est}.\n` +
+        `분석할 계정 수를 줄이면 소요 시간도 줄어듭니다.\n\n` +
         `분석이 끝날 때까지 이 탭을 열어두세요. 진행할까요?`
     );
     if (!ok) return;

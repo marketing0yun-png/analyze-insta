@@ -43,6 +43,12 @@ const phases = [
     desc: "내 계정 노출·도달 인사이트 수집·비교, 일괄·일일캐시. (배포 잔여: 마스터·구글로그인)",
     state: "current" as const,
   },
+  {
+    n: "3.5",
+    title: "프리미엄 티어 + 사용량 미터",
+    desc: "베타 무료 운영(비용 방어) + 개인 토큰 발급 유도. 2시간 슬라이딩 한도, 해시태그 신청.",
+    state: "later" as const,
+  },
 ];
 
 const stateLabel = {
