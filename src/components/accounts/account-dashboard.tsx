@@ -23,8 +23,11 @@ import {
   YAxis,
 } from "recharts";
 
+import { ContentInsights } from "@/components/accounts/content-insights";
+import { EngagementMeter } from "@/components/accounts/engagement-badge";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -33,6 +36,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { AccountMetrics } from "@/lib/analytics/account-metrics";
+
+type DashboardTab = "metrics" | "insights";
 
 type MetricsResponse = {
   account: {
@@ -82,6 +87,7 @@ export function AccountDashboard({ id }: { id: string }) {
   const [data, setData] = React.useState<MetricsResponse | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [tab, setTab] = React.useState<DashboardTab>("metrics");
 
   const load = React.useCallback(async () => {
     const res = await fetch(`/api/accounts/metrics?id=${encodeURIComponent(id)}`, {
@@ -169,7 +175,29 @@ export function AccountDashboard({ id }: { id: string }) {
         )}
       </header>
 
-      {noData ? (
+      {/* 탭: 공개지표 / AI 콘텐츠 인사이트 */}
+      <div className="bg-muted/40 inline-flex gap-1 rounded-lg border p-1">
+        <Button
+          type="button"
+          size="sm"
+          variant={tab === "metrics" ? "default" : "ghost"}
+          onClick={() => setTab("metrics")}
+        >
+          지표
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={tab === "insights" ? "default" : "ghost"}
+          onClick={() => setTab("insights")}
+        >
+          콘텐츠 인사이트
+        </Button>
+      </div>
+
+      {tab === "insights" ? (
+        <ContentInsights id={id} />
+      ) : noData ? (
         <Card>
           <CardContent className="text-muted-foreground py-8 text-center text-sm">
             아직 수집된 게시물이 없습니다. 목록에서 <RefreshCw className="inline size-3" />{" "}
@@ -224,6 +252,23 @@ export function AccountDashboard({ id }: { id: string }) {
               }
             />
           </div>
+
+          {/* 참여율 등급 (규모 보정) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">참여율 등급</CardTitle>
+              <CardDescription>
+                팔로워 규모 대비 기대치(눈금)와 비교한 참여율. 비즈니스·대형
+                계정은 평균이 낮은 게 정상이라 규모별로 다르게 평가합니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EngagementMeter
+                rate={metrics.engagementRate}
+                followers={followers}
+              />
+            </CardContent>
+          </Card>
 
           {/* 포맷 비중 */}
           <Card>

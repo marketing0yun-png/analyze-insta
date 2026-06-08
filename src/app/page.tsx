@@ -23,18 +23,24 @@ const phases = [
     n: 1,
     title: "외부계정 공개지표 대시보드",
     desc: "토큰 입력 → Business Discovery 수집 → 참여율·업로드 루틴·해시태그 분석.",
-    state: "current" as const,
+    state: "done" as const,
   },
   {
     n: 2,
     title: "AI 콘텐츠 분석",
-    desc: "캡션·미디어 → Claude API 주제·소구점·카피톤 분석.",
-    state: "later" as const,
+    desc: "캡션 → Gemini(Vertex AI) 주제·소구점·카피톤·키워드 분석.",
+    state: "done" as const,
+  },
+  {
+    n: "2.5",
+    title: "매장 비교 분석",
+    desc: "참여율 순위 + 매장 선택 → 정량 비교표 + LLM 냉정 평가.",
+    state: "current" as const,
   },
   {
     n: 3,
     title: "위임계정 완전분석 + 비교 + 배포",
-    desc: "노출·도달 인사이트, 비교 리포트, 구글 로그인 전환.",
+    desc: "노출·도달 인사이트, 노출·도달 비교 보강, 구글 로그인 전환.",
     state: "later" as const,
   },
 ];
@@ -55,7 +61,7 @@ export default function Home() {
             <TrendingUp className="size-5" />
           </span>
           <Badge variant="outline" className="gap-1">
-            <Activity className="size-3" /> Phase 1
+            <Activity className="size-3" /> Phase 2.5
           </Badge>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">

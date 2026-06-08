@@ -3,6 +3,12 @@
 > 개발 재개 시 **여기 "다음 할 일"부터** 본다. 작업 완료마다 체크박스/상태 갱신.
 
 ## 현재 상태
+🟢 **Phase 2 콘텐츠 분석 + Phase 2.5 매장 비교 분석 구현 완료(로컬, build/lint 통과 2026-06-08) — 사용자 검수 대기.**
+- 캡션 → AI 분석(`/api/accounts/analyze`, Gemini/Vertex 청크 배치) → `content_analysis` 적재 → 대시보드 "콘텐츠 인사이트" 탭(소구점/톤/포맷/키워드/게시물별).
+- **비교(2.5):** 참여율 자동순위 리더보드(`/api/accounts/ranking`) + 2~5개 선택 → 정량표 + LLM 냉정 평가(`/api/accounts/compare`, `/compare` 화면). 노출·도달은 비교 제외(공개지표 한정, D-021).
+- 증분 분석 기본(미분석만), "전체 재분석" 지원. 이미지 비전은 후속(멀티모달 provider) 과제.
+- **검수 포인트:** ① 토큰 연결 + 계정 수집 후 → `/accounts/[id]` "콘텐츠 인사이트" 탭 → "AI 분석 실행" → 소구점/톤/키워드·게시물별. ② 홈 "비교 분석"(2개+ 계정) → `/compare` → 매장 선택 → 냉정 평가. (Vertex 자격증명 필요)
+
 🟢 **Phase 1 기능 구현 완료(로컬) — 사용자 검수 대기. 토큰·수집·대시보드·해시태그까지 실동작 검증(2026-06-08).**
 - 공용 Supabase(`nushcvgafwqosnkzlsrm`, "marketing0yun's Project")에 `analyze_insta_*` 11테이블+RLS 이미 적용 확인.
 - `.env.local` 작성: Supabase URL/anon키 + `TOKEN_ENCRYPTION_KEY` + `SUPABASE_SERVICE_ROLE_KEY`.
@@ -50,16 +56,30 @@
 
 ## Phase 2 — AI 콘텐츠 분석
 - [x] AI 프로바이더 추상화(`lib/ai/`) + **Gemini 2.5 Flash(Vertex AI)** 1차 구현 — 연결 검증(`/api/ai/ping`, 2026-06-08). 모델 교체/사용자 선택 대비(D-019).
-- [ ] 캡션 + 미디어 → AI 분석 파이프라인(프로바이더 추상화 위에서 구현)
-- [ ] `content_analysis` 저장(주제·소구점·포맷·카피톤) — **모델 중립 JSON 스키마**
-- [ ] 대시보드에 콘텐츠 인사이트 탭
+- [x] 캡션 → AI 분석 파이프라인(프로바이더 추상화 위에서 구현) — **구현 완료(로컬, build/lint 통과 2026-06-08).**
+      (`lib/ai/content-analysis.ts` 청크 10개 배치·json 모드, `lib/ai/analyze-account.ts` 증분/재분석 오케스트레이터, `POST /api/accounts/analyze`)
+      ⚠️ 이미지 **비전** 분석은 provider 인터페이스(텍스트 전용) 확장 필요 → 후속(멀티모달) 과제.
+- [x] `content_analysis` 저장(주제·소구점·포맷·카피톤·요약·키워드) — **모델 중립 JSON 스키마**(`ContentAnalysis` 타입). 멱등 적재(대상 기존행 삭제 후 삽입).
+- [x] 대시보드에 콘텐츠 인사이트 탭
+      (`/accounts/[id]` 지표/인사이트 탭 전환, `components/accounts/content-insights.tsx` — 소구점 빈도·톤/포맷·키워드·게시물별 분석, `lib/analytics/content-insights.ts` 집계, `GET /api/accounts/insights`)
 - [ ] (정식) Claude provider 추가 또는 사용자별 모델 선택
-- **완료 기준:** "어떤 내용/소구점의 콘텐츠가 반응이 좋은가"가 보인다.
+- [ ] 이미지 비전 분석(멀티모달 provider) — 캡션 외 미디어까지 확장
+- **완료 기준:** "어떤 내용/소구점의 콘텐츠가 반응이 좋은가"가 보인다. → **구현 완료(캡션 기반), 사용자 검수 대기.**
 - **모델 전략:** 베타까지 Gemini(Vertex 무료 크레딧)로 운영 → 정식 때 Claude 전환 or 사용자 선택(D-019).
+
+## Phase 2.5 — 매장 비교 분석 (공개지표 기반, Phase 3에서 앞당김 · D-021)
+- [x] 참여율 자동순위 리더보드 (`GET /api/accounts/ranking`, 공용 로더 `lib/server/account-report.ts`)
+- [x] 2~5개 매장 선택 → 정량 비교표 + **LLM 냉정 평가**(강점·약점·개선책 + 매장별 콘텐츠 아이디어 + 전반 기회·다음 액션)
+      (`lib/ai/compare-accounts.ts` 모델중립 `ComparisonReport`, `POST /api/accounts/compare`, `reports(kind='comparison')` 적재)
+- [x] **벤치마크(목표) 매장 사용자 지정** — 비교마다 ⭐로 따라잡을 대상을 고르면, 나머지 매장이 그 수준에 도달할 방법 중심으로 평가(미지정 시 자동 순위 폴백). per-comparison `benchmarkIds`.
+- [x] **참여율 등급(규모 보정)** — 팔로워 규모별 기대치 대비 활발/양호/평균/다소 낮음 + 색상 배지·미터(`lib/analytics/engagement-benchmark.ts`, `components/accounts/engagement-badge.tsx`). 대시보드·리더보드·비교표 공통.
+- [x] 전용 화면 `/compare`(`components/accounts/compare-view.tsx`) + 홈 "비교 분석" 진입
+- **완료 기준:** "잘나가는 vs 우리 / 잘 vs 못 / 못 vs 우리"를 골라 왜 차이 나는지 본다. → **구현 완료(로컬, build/lint 통과 2026-06-08), 사용자 검수 대기.**
+- **한계:** 노출·도달은 비교 불가(외부=공개지표 한정). 노출·도달 포함 완전 비교는 Phase 3(위임 계정).
 
 ## Phase 3 — 위임 계정 완전분석 + 비교 + 배포 준비
 - [ ] 위임(owned) 계정 Insights 수집(노출·도달·저장 등)
-- [ ] 위임 vs 외부 공개지표 **비교 리포트**
+- [ ] 위임 vs 외부 **비교 리포트에 노출·도달 차원 추가** (공개지표 비교는 Phase 2.5에서 완료 · D-021)
 - [ ] 마스터 콘솔(전체 데이터 조합 뷰)
 - [ ] **익명 → 구글 로그인 교체/연결**(link identity)
 - [ ] Meta 앱 검수(일반 공개 시) / 또는 테스터 한정 운영 결정
@@ -83,11 +103,14 @@
 ---
 
 ## 다음 할 일 (Next Action)
-> Phase 1 전 기능 구현 완료. **사용자 검수 단계.**
-> 1. **검수(`npm run dev`):**
->    - 대시보드: 분석 대상 행의 "분석"(수집 후 노출) → `/accounts/[id]` 에서 참여율·시간대(KST)·요일·포맷 파이·상위 게시물 확인.
->    - 해시태그: "해시태그 검색" 카드에서 키워드 검색 → 인기 게시물·쿼터 카운터(N/30) 동작 확인. (쿼터 소비 주의)
-> 2. **검수 피드백 반영** → 지표 정의/표현 조정.
-> 3. **(다음 Phase) Phase 2 AI 콘텐츠 분석** 착수 여부 결정 — 적재된 캡션/미디어 → Claude API 주제·소구점·카피톤.
-> 4. **(추후/비차단)** 배치 수집 Edge Function 분리(D-015), Meta 앱 시크릿 입력(장기토큰 교환).
+> Phase 1 + Phase 2(콘텐츠 분석) + Phase 2.5(매장 비교) 구현 완료. **사용자 검수 단계.**
+> 1. **Phase 2 검수(`npm run dev`):**
+>    - 토큰 연결 + 계정 수집 후 → `/accounts/[id]` → "콘텐츠 인사이트" 탭 → "AI 분석 실행".
+>    - 소구점 빈도·톤/포맷·키워드·게시물별(주제·요약·소구점) 카드 확인. "전체 재분석" 동작 확인.
+>    - ⚠️ Vertex 자격증명 필요(`GOOGLE_APPLICATION_CREDENTIALS` 또는 인라인 JSON). `/api/ai/ping` 으로 연결 선검증.
+> 2. **Phase 2.5 검수:** 홈 "비교 분석" → `/compare` → 참여율 리더보드 확인 → 매장 2~5개 선택 → "비교 분석" → 정량표 + 냉정 평가(강점/약점/개선책). (각 매장 콘텐츠 분석이 선행돼야 의미 있음)
+> 3. **Phase 1 검수(잔여):** 분석 대상 "분석" → 참여율·시간대(KST)·요일·포맷·상위 게시물. 해시태그 검색(쿼터 N/30, 소비 주의).
+> 4. **검수 피드백 반영** → 분석/비교 프롬프트·스키마 조정.
+> 5. **(다음)** 이미지 비전(멀티모달 provider) 또는 Phase 3(위임 계정 노출·도달 + 비교 보강) 착수 판단.
+> 6. **(추후/비차단)** 배치 수집/분석 Edge Function 분리(D-015), Meta 앱 시크릿 입력(장기토큰 교환).
 > - 로컬 실행: `npm install` → `npm run dev` → http://localhost:3000

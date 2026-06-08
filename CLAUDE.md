@@ -35,12 +35,14 @@
 4. **Phase 4** 서드파티 PoC → 외부 경쟁사 조회수·댓글내용 보강
 
 ## 현재 상태
-- **Phase 1 기능 구현 완료(로컬) — 사용자 검수 단계.** 토큰 연결·수집·대시보드·해시태그까지 실동작 검증(2026-06-08). `npm run build`/lint 통과.
-- 신규 흐름: 등록/수집(`/api/accounts`, `/api/accounts/collect`, `lib/meta/collect.ts`) → 지표/대시보드(`lib/analytics/account-metrics.ts`, `/api/accounts/metrics`, `/accounts/[id]` Recharts) → 해시태그(`lib/meta/hashtag.ts` 7일 롤링 30개 쿼터, `/api/hashtags`, `HashtagCard`).
-- 적재: snapshots/media_posts/post_metrics(외부=노출·도달 null), hashtag_jobs/results. 지표는 조회 시 계산(캐시 안 함, D-016).
+- **Phase 1 + Phase 2(콘텐츠 분석) + Phase 2.5(매장 비교) 구현 완료(로컬) — 사용자 검수 단계.** `npm run build`/lint 통과.
+- Phase 1 흐름: 등록/수집(`/api/accounts`, `/api/accounts/collect`, `lib/meta/collect.ts`) → 지표/대시보드(`lib/analytics/account-metrics.ts`, `/api/accounts/metrics`, `/accounts/[id]` Recharts) → 해시태그(`lib/meta/hashtag.ts` 7일 롤링 30개 쿼터, `/api/hashtags`, `HashtagCard`).
+- Phase 2 흐름: 캡션→AI 분석(`lib/ai/content-analysis.ts` 청크 배치, `lib/ai/analyze-account.ts` 증분/재분석, `/api/accounts/analyze`)→`content_analysis` 적재→대시보드 "콘텐츠 인사이트" 탭(소구점/톤/포맷/키워드/게시물별, `/api/accounts/insights`, `lib/analytics/content-insights.ts`). 이미지 비전은 후속(멀티모달 provider). 상세 D-019/D-020.
+- Phase 2.5 비교: 참여율 자동순위(`/api/accounts/ranking`, 공용 로더 `lib/server/account-report.ts`) + 2~5개 매장 → 정량표 + LLM 냉정 평가(`lib/ai/compare-accounts.ts`, `/api/accounts/compare`, `reports(kind='comparison')` 적재, `/compare` 화면). 노출·도달 비교는 Phase 3. 상세 D-021.
+- 적재: snapshots/media_posts/post_metrics(외부=노출·도달 null), hashtag_jobs/results, content_analysis(가공). 지표는 조회 시 계산(캐시 안 함, D-016).
 - 공용 Supabase(`nushcvgafwqosnkzlsrm`)에 `analyze_insta_*` 테이블 적용. **익명 로그인 ON + service-role 키 입력·검증 완료**.
-- **남은 블로커(비차단):** Meta 앱 `META_APP_ID/SECRET` 보류 — 없어도 동작(appsecret_proof·장기토큰 교환만 비활성).
-- 다음 작업: 검수 피드백 반영 → Phase 2(AI 콘텐츠 분석) 착수 판단. `docs/07_ROADMAP.md` "다음 할 일" 참조.
+- **남은 블로커(비차단):** Meta 앱 `META_APP_ID/SECRET` 보류 — 없어도 동작(appsecret_proof·장기토큰 교환만 비활성). AI 분석은 Vertex 자격증명 필요(`/api/ai/ping` 선검증).
+- 다음 작업: Phase 2 검수 피드백 반영 → 이미지 비전(멀티모달) 또는 Phase 3 착수 판단. `docs/07_ROADMAP.md` "다음 할 일" 참조.
 
 ## 작업 규칙
 - 새 기능/결정을 추가하면 **반드시 관련 docs와 `docs/09_DECISIONS.md`를 갱신**한다.

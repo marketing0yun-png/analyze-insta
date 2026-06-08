@@ -8,6 +8,7 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  Scale,
   Trash2,
   Users,
 } from "lucide-react";
@@ -181,9 +182,18 @@ export function AccountsCard() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <BarChart3 className="size-4" /> 분석 대상 계정
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="size-4" /> 분석 대상 계정
+          </CardTitle>
+          {accounts.length >= 2 && (
+            <Button asChild variant="outline" size="sm">
+              <Link href="/compare">
+                <Scale /> 비교 분석
+              </Link>
+            </Button>
+          )}
+        </div>
         <CardDescription>
           외부 비즈니스/크리에이터 계정의 <strong>username</strong>을 등록하고
           공개지표(팔로워·좋아요·댓글수)를 수집합니다. 개인계정·노출/도달은 불가.
