@@ -1,6 +1,8 @@
 import { Activity, TrendingUp } from "lucide-react";
 
+import { AccountsCard } from "@/components/accounts/accounts-card";
 import { ConnectCard } from "@/components/credentials/connect-card";
+import { HashtagCard } from "@/components/hashtags/hashtag-card";
 import { SetupStatus } from "@/components/setup-status";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,13 +17,13 @@ const phases = [
     n: 0,
     title: "스캐폴딩",
     desc: "Next.js + Tailwind + shadcn/ui + PWA, Supabase 익명인증, 기본 스키마.",
-    state: "current" as const,
+    state: "done" as const,
   },
   {
     n: 1,
     title: "외부계정 공개지표 대시보드",
     desc: "토큰 입력 → Business Discovery 수집 → 참여율·업로드 루틴·해시태그 분석.",
-    state: "next" as const,
+    state: "current" as const,
   },
   {
     n: 2,
@@ -38,6 +40,7 @@ const phases = [
 ];
 
 const stateLabel = {
+  done: { label: "완료", cls: "" },
   current: { label: "진행 중", cls: "bg-emerald-600 text-white" },
   next: { label: "다음", cls: "" },
   later: { label: "예정", cls: "" },
@@ -52,7 +55,7 @@ export default function Home() {
             <TrendingUp className="size-5" />
           </span>
           <Badge variant="outline" className="gap-1">
-            <Activity className="size-3" /> Phase 0
+            <Activity className="size-3" /> Phase 1
           </Badge>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -60,13 +63,15 @@ export default function Home() {
         </h1>
         <p className="text-muted-foreground mt-2 text-sm sm:text-base">
           인스타그램 중심 SNS 트렌드·경쟁 분석기. 공개지표를 수집·분석·리포트한다.
-          스캐폴딩이 동작 중입니다.
+          외부 계정을 등록하고 공개지표를 수집해 보세요.
         </p>
       </header>
 
       <section className="mb-8 space-y-3">
         <SetupStatus />
         <ConnectCard />
+        <AccountsCard />
+        <HashtagCard />
       </section>
 
       <section>

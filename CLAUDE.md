@@ -35,10 +35,12 @@
 4. **Phase 4** 서드파티 PoC → 외부 경쟁사 조회수·댓글내용 보강
 
 ## 현재 상태
-- **Phase 1 착수(로컬).** 토큰 입력/검증→`ig_user_id` 추출→AES-256-GCM 암호화 저장 흐름 구현. `npm run build`/lint 통과.
+- **Phase 1 기능 구현 완료(로컬) — 사용자 검수 단계.** 토큰 연결·수집·대시보드·해시태그까지 실동작 검증(2026-06-08). `npm run build`/lint 통과.
+- 신규 흐름: 등록/수집(`/api/accounts`, `/api/accounts/collect`, `lib/meta/collect.ts`) → 지표/대시보드(`lib/analytics/account-metrics.ts`, `/api/accounts/metrics`, `/accounts/[id]` Recharts) → 해시태그(`lib/meta/hashtag.ts` 7일 롤링 30개 쿼터, `/api/hashtags`, `HashtagCard`).
+- 적재: snapshots/media_posts/post_metrics(외부=노출·도달 null), hashtag_jobs/results. 지표는 조회 시 계산(캐시 안 함, D-016).
 - 공용 Supabase(`nushcvgafwqosnkzlsrm`)에 `analyze_insta_*` 테이블 적용. **익명 로그인 ON + service-role 키 입력·검증 완료**.
-- **남은 블로커:** Meta 앱 `META_APP_ID/SECRET`(휴대폰 인증 이슈로 보류). → 토큰 연결 실제 동작 검증은 Meta 재개 후.
-- 다음 작업: `docs/07_ROADMAP.md`의 "다음 할 일" 참조.
+- **남은 블로커(비차단):** Meta 앱 `META_APP_ID/SECRET` 보류 — 없어도 동작(appsecret_proof·장기토큰 교환만 비활성).
+- 다음 작업: 검수 피드백 반영 → Phase 2(AI 콘텐츠 분석) 착수 판단. `docs/07_ROADMAP.md` "다음 할 일" 참조.
 
 ## 작업 규칙
 - 새 기능/결정을 추가하면 **반드시 관련 docs와 `docs/09_DECISIONS.md`를 갱신**한다.

@@ -161,6 +161,218 @@ export async function resolveInstagramUser(
   };
 }
 
+// =====================================================================
+// Business Discovery — 외부 비즈니스/크리에이터 계정 공개지표 (Phase 1)
+// 참조: docs/05_META_API.md, /meta-api 스킬.
+// 노출/도달/댓글내용은 제공되지 않는다(외부 계정 한계). 좋아요·댓글수·캡션만.
+// =====================================================================
+
+export type BusinessDiscoveryMedia = {
+  id: string;
+  caption: string | null;
+  like_count: number | null;
+  comments_count: number | null;
+  media_type: string | null;
+  media_product_type: string | null;
+  media_url: string | null;
+  permalink: string | null;
+  timestamp: string | null;
+};
+
+export type BusinessDiscoveryProfile = {
+  igId: string;
+  username: string | null;
+  name: string | null;
+  biography: string | null;
+  followersCount: number | null;
+  mediaCount: number | null;
+  profilePictureUrl: string | null;
+  media: BusinessDiscoveryMedia[];
+};
+
+type BusinessDiscoveryResponse = {
+  business_discovery?: {
+    id?: string;
+    username?: string;
+    name?: string;
+    biography?: string;
+    followers_count?: number;
+    media_count?: number;
+    profile_picture_url?: string;
+    media?: {
+      data?: Array<{
+        id: string;
+        caption?: string;
+        like_count?: number;
+        comments_count?: number;
+        media_type?: string;
+        media_product_type?: string;
+        media_url?: string;
+        permalink?: string;
+        timestamp?: string;
+      }>;
+    };
+  };
+};
+
+/**
+ * 위임 토큰의 ig_user_id 로 외부 대상(username)의 공개지표를 조회.
+ * 대상이 비즈니스/크리에이터 계정이 아니거나 존재하지 않으면 MetaApiError.
+ * @param mediaLimit 가져올 최근 게시물 수 (기본 25).
+ */
+export async function fetchBusinessDiscovery(
+  token: string,
+  igUserId: string,
+  targetUsername: string,
+  mediaLimit = 25
+): Promise<BusinessDiscoveryProfile> {
+  const username = targetUsername.trim().replace(/^@/, "");
+  if (!username) {
+    throw new MetaApiError("분석할 계정 username 을 입력하세요.", 400);
+  }
+
+  const mediaFields =
+    "id,caption,like_count,comments_count,media_type," +
+    "media_product_type,media_url,permalink,timestamp";
+  const fields =
+    `business_discovery.username(${username}){` +
+    `followers_count,media_count,biography,name,username,profile_picture_url,` +
+    `media.limit(${mediaLimit}){${mediaFields}}}`;
+
+  let res: BusinessDiscoveryResponse;
+  try {
+    res = await graphGet<BusinessDiscoveryResponse>(igUserId, token, { fields });
+  } catch (err) {
+    // 대상이 개인계정/미존재일 때 Meta 가 주는 모호한 메시지를 보강.
+    if (err instanceof MetaApiError) {
+      const lower = err.message.toLowerCase();
+      if (
+        lower.includes("cannot be found") ||
+        lower.includes("does not exist") ||
+        lower.includes("business discovery")
+      ) {
+        throw new MetaApiError(
+          `@${username} 의 공개지표를 가져올 수 없습니다. ` +
+            "대상이 비즈니스/크리에이터 계정이어야 하며(개인계정 불가), " +
+            "존재하는 username 인지 확인하세요.",
+          err.status,
+          err.raw
+        );
+      }
+    }
+    throw err;
+  }
+
+  const bd = res.business_discovery;
+  if (!bd?.id) {
+    throw new MetaApiError(
+      `@${username} 의 공개지표 응답이 비어 있습니다. 비즈니스/크리에이터 계정인지 확인하세요.`,
+      400
+    );
+  }
+
+  return {
+    igId: bd.id,
+    username: bd.username ?? username,
+    name: bd.name ?? null,
+    biography: bd.biography ?? null,
+    followersCount: bd.followers_count ?? null,
+    mediaCount: bd.media_count ?? null,
+    profilePictureUrl: bd.profile_picture_url ?? null,
+    media: (bd.media?.data ?? []).map((m) => ({
+      id: m.id,
+      caption: m.caption ?? null,
+      like_count: m.like_count ?? null,
+      comments_count: m.comments_count ?? null,
+      media_type: m.media_type ?? null,
+      media_product_type: m.media_product_type ?? null,
+      media_url: m.media_url ?? null,
+      permalink: m.permalink ?? null,
+      timestamp: m.timestamp ?? null,
+    })),
+  };
+}
+
+// =====================================================================
+// 해시태그 검색 (Phase 1 보조) — ⚠️ 토큰당 7일 30개 고유 태그 하드 쿼터.
+// 작성자 정보·조회수 없음. 호출부에서 쿼터를 사전 enforce 해야 한다.
+// =====================================================================
+
+export type HashtagMedia = {
+  id: string;
+  caption: string | null;
+  like_count: number | null;
+  comments_count: number | null;
+  media_type: string | null;
+  permalink: string | null;
+  timestamp: string | null;
+};
+
+type HashtagSearchResponse = { data?: Array<{ id: string }> };
+type HashtagMediaResponse = {
+  data?: Array<{
+    id: string;
+    caption?: string;
+    like_count?: number;
+    comments_count?: number;
+    media_type?: string;
+    permalink?: string;
+    timestamp?: string;
+  }>;
+};
+
+/** 키워드 → hashtag_id. ⚠️ 이 호출도 7일/30개 쿼터를 소비한다. */
+export async function searchHashtag(
+  token: string,
+  igUserId: string,
+  keyword: string
+): Promise<string> {
+  const q = keyword.trim().replace(/^#/, "");
+  if (!q) throw new MetaApiError("해시태그를 입력하세요.", 400);
+
+  const res = await graphGet<HashtagSearchResponse>("ig_hashtag_search", token, {
+    user_id: igUserId,
+    q,
+  });
+  const id = res.data?.[0]?.id;
+  if (!id) {
+    throw new MetaApiError(`#${q} 에 해당하는 해시태그를 찾지 못했습니다.`, 404);
+  }
+  return id;
+}
+
+/**
+ * hashtag_id 의 인기/최근 게시물. type='top'(인기) 기본.
+ * 반환에 작성자·조회수 없음(Meta 미제공).
+ */
+export async function fetchHashtagMedia(
+  token: string,
+  igUserId: string,
+  hashtagId: string,
+  type: "top" | "recent" = "top",
+  limit = 25
+): Promise<HashtagMedia[]> {
+  const edge = type === "top" ? "top_media" : "recent_media";
+  const res = await graphGet<HashtagMediaResponse>(
+    `${hashtagId}/${edge}`,
+    token,
+    {
+      user_id: igUserId,
+      fields: "id,caption,like_count,comments_count,media_type,permalink,timestamp",
+      limit: String(limit),
+    }
+  );
+  return (res.data ?? []).map((m) => ({
+    id: m.id,
+    caption: m.caption ?? null,
+    like_count: m.like_count ?? null,
+    comments_count: m.comments_count ?? null,
+    media_type: m.media_type ?? null,
+    permalink: m.permalink ?? null,
+    timestamp: m.timestamp ?? null,
+  }));
+}
+
 export type LongLivedToken = {
   token: string;
   /** 만료 시각(ISO). 알 수 없으면 null. */
