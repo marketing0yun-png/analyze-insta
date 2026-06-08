@@ -4,11 +4,28 @@
  * 이 타입에만 의존하도록 한다. 프로바이더 교체/사용자 선택의 핵심.
  */
 
+/**
+ * 멀티모달 이미지 입력 1장 — **인라인 바이트(base64)**. (D-022)
+ * Vertex 의 Gemini 는 임의 HTTP URL 을 직접 fetch 하지 못하므로(gs:// 만 가능),
+ * 호출부가 이미지 바이트를 받아 base64 로 넘긴다. 텍스트 전용 프로바이더는 무시.
+ */
+export type ImagePart = {
+  /** MIME 타입 (image/jpeg, image/png, image/webp …). */
+  mimeType: string;
+  /** base64 로 인코딩된 이미지 바이트. */
+  data: string;
+};
+
 export type GenerateTextOptions = {
   /** 시스템 지시(역할·규칙). */
   system?: string;
   /** 사용자 프롬프트(분석 대상 텍스트 등). */
   prompt: string;
+  /**
+   * 멀티모달 이미지 입력(선택). 프롬프트 텍스트 **뒤에 순서대로** 첨부된다. (D-022)
+   * 프롬프트에서 "N번째 이미지"로 게시물과 연결한다. supportsVision=false 면 무시.
+   */
+  images?: ImagePart[];
   /** true 면 JSON 출력(application/json) 강제. 기본 false. */
   json?: boolean;
   /** 0~1. 기본은 프로바이더 기본값. */

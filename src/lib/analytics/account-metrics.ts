@@ -29,6 +29,11 @@ export type PostInput = {
   postedAt: string | null; // ISO
   likeCount: number | null;
   commentsCount: number | null;
+  /** 내 계정(delegated) 전용 인사이트. 외부 계정은 항상 null(D-023). */
+  reach?: number | null;
+  impressions?: number | null;
+  saved?: number | null;
+  videoViews?: number | null;
 };
 
 export type FormatShare = {
@@ -50,6 +55,9 @@ export type TopPost = {
   likeCount: number;
   commentsCount: number;
   engagement: number; // like + comments
+  /** 내 계정 전용(있을 때만). */
+  reach: number | null;
+  impressions: number | null;
 };
 
 export type AccountMetrics = {
@@ -62,6 +70,11 @@ export type AccountMetrics = {
   postsPerWeek: number | null;
   /** 평균 업로드 간격(시간). 게시물 2개 미만이면 null. */
   avgIntervalHours: number | null;
+  /** 내 계정(delegated) 전용 — 인사이트 데이터가 있는 게시물 평균. 외부는 모두 null(D-023). */
+  avgReach: number | null;
+  avgImpressions: number | null;
+  avgSaved: number | null;
+  avgVideoViews: number | null;
   formats: FormatShare[];
   byHour: HourBucket[];
   byWeekday: WeekdayBucket[];
@@ -99,6 +112,19 @@ export function computeAccountMetrics(
       );
     }
   }
+
+  // 내 계정(delegated) 인사이트 평균 — 값이 있는 게시물만 평균.
+  const avgOf = (pick: (p: PostInput) => number | null | undefined): number | null => {
+    const vals = posts
+      .map(pick)
+      .filter((v): v is number => typeof v === "number");
+    if (vals.length === 0) return null;
+    return round(vals.reduce((s, v) => s + v, 0) / vals.length);
+  };
+  const avgReach = avgOf((p) => p.reach);
+  const avgImpressions = avgOf((p) => p.impressions);
+  const avgSaved = avgOf((p) => p.saved);
+  const avgVideoViews = avgOf((p) => p.videoViews);
 
   // 포맷 비중
   const formatCounts = new Map<MediaKind | "unknown", number>();
@@ -166,6 +192,8 @@ export function computeAccountMetrics(
         likeCount,
         commentsCount,
         engagement: likeCount + commentsCount,
+        reach: p.reach ?? null,
+        impressions: p.impressions ?? null,
       };
     })
     .sort((a, b) => b.engagement - a.engagement)
@@ -178,6 +206,10 @@ export function computeAccountMetrics(
     engagementRate,
     postsPerWeek,
     avgIntervalHours,
+    avgReach,
+    avgImpressions,
+    avgSaved,
+    avgVideoViews,
     formats,
     byHour,
     byWeekday,

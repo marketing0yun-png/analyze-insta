@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { AIError } from "@/lib/ai";
 import { analyzeTrackedAccount } from "@/lib/ai/analyze-account";
+import { getVisionEnabled } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,6 +14,9 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const ACCOUNTS = "analyze_insta_tracked_accounts";
+
+/** 한 요청당 분석 게시물 기본 청크(=content-analysis CHUNK_SIZE). 60초 한도 회피(D-023). */
+const DEFAULT_LIMIT = 10;
 
 /**
  * POST { id, reanalyze? } — 분석 대상의 수집 게시물을 AI 로 콘텐츠 분석.
@@ -32,10 +36,16 @@ export async function POST(req: Request) {
   }
 
   const body = (await req.json().catch(() => null)) as
-    | { id?: unknown; reanalyze?: unknown }
+    | { id?: unknown; reanalyze?: unknown; vision?: unknown; limit?: unknown }
     | null;
   const id = typeof body?.id === "string" ? body.id : "";
   const reanalyze = body?.reanalyze === true;
+  // 명시값(요청) > 서버 기본(env). 비전 끄려면 vision:false.
+  const vision = typeof body?.vision === "boolean" ? body.vision : getVisionEnabled();
+  // 한 요청에 처리할 게시물 수. Vercel 60초/요청 한도 회피를 위해 기본 10개씩 쪼개
+  // 처리하고, 클라가 remaining 이 0 될 때까지 반복 호출한다(D-023). 0/미지정이면 기본.
+  const limit =
+    typeof body?.limit === "number" && body.limit > 0 ? body.limit : DEFAULT_LIMIT;
   if (!id) {
     return NextResponse.json({ error: "대상 id 가 필요합니다." }, { status: 400 });
   }
@@ -56,7 +66,11 @@ export async function POST(req: Request) {
 
   try {
     const admin = createAdminClient();
-    const result = await analyzeTrackedAccount(admin, id, { reanalyze });
+    const result = await analyzeTrackedAccount(admin, id, {
+      reanalyze,
+      vision,
+      limit,
+    });
     return NextResponse.json({ ok: true, result }, { status: 200 });
   } catch (err) {
     if (err instanceof AIError) {

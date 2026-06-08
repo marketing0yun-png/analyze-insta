@@ -21,15 +21,19 @@ const MEDIA = "analyze_insta_media_posts";
 const METRICS = "analyze_insta_post_metrics";
 const ANALYSIS = "analyze_insta_content_analysis";
 
-/** 한 번에 분석할 게시물 상한(비용·시간 보호). 최신 게시물 우선. */
+/** 한 계정에서 분석 대상으로 삼을 최신 게시물 상한(비용·시간 보호). */
 const MAX_POSTS = 30;
 
 export type AnalyzeAccountResult = {
   analyzed: number;
   skipped: number;
+  /** 이번 호출에서 처리하지 못하고 남은 미분석 게시물 수(클라가 0 될 때까지 반복). D-023. */
+  remaining: number;
   model: string | null;
   inputTokens: number | null;
   outputTokens: number | null;
+  /** 비전으로 이미지가 실제 분석된 게시물 수. D-022. */
+  imagesAnalyzed: number;
 };
 
 type MetricRow = {
@@ -44,6 +48,8 @@ type MediaRow = {
   caption: string | null;
   media_type: PostForAnalysis["mediaType"];
   posted_at: string | null;
+  media_url: string | null;
+  raw: Record<string, unknown> | null;
   metrics: MetricRow[] | null;
 };
 
@@ -54,16 +60,29 @@ function latestMetric(metrics: MetricRow[] | null): MetricRow | null {
   )[0];
 }
 
+/**
+ * 비전 분석에 쓸 이미지 URL. (D-022)
+ * image/carousel = media_url(이미지). video/reel = raw.thumbnail_url(있을 때만 —
+ * media_url 은 비디오 파일이라 인라인 비전 불가). 없으면 null → 캡션만 분석.
+ */
+function imageUrlForRow(row: MediaRow): string | null {
+  if (row.media_type === "video" || row.media_type === "reel") {
+    const thumb = row.raw?.thumbnail_url;
+    return typeof thumb === "string" && thumb ? thumb : null;
+  }
+  return row.media_url ?? null;
+}
+
 export async function analyzeTrackedAccount(
   admin: SupabaseClient,
   accountId: string,
-  opts: { reanalyze?: boolean } = {}
+  opts: { reanalyze?: boolean; vision?: boolean; limit?: number } = {}
 ): Promise<AnalyzeAccountResult> {
   // 1) 대상 게시물 + 최신 지표(최신순, 상한 적용).
   const { data: mediaRows, error: mediaError } = await admin
     .from(MEDIA)
     .select(
-      `id, external_media_id, caption, media_type, posted_at,
+      `id, external_media_id, caption, media_type, posted_at, media_url, raw,
        metrics:${METRICS}(captured_at, like_count, comments_count)`
     )
     .eq("tracked_account_id", accountId)
@@ -73,33 +92,59 @@ export async function analyzeTrackedAccount(
 
   const rows = (mediaRows ?? []) as MediaRow[];
   if (rows.length === 0) {
-    return { analyzed: 0, skipped: 0, model: null, inputTokens: null, outputTokens: null };
-  }
-
-  // 2) 증분: 이미 분석된 media_post_id 집합. reanalyze 면 무시(전체 재분석).
-  const idByExternal = new Map<string, string>(); // external_media_id → media_post.id
-  for (const r of rows) idByExternal.set(r.external_media_id, r.id);
-
-  let alreadyDone = new Set<string>();
-  if (!opts.reanalyze) {
-    const { data: existing, error: exError } = await admin
-      .from(ANALYSIS)
-      .select("media_post_id")
-      .in("media_post_id", [...idByExternal.values()]);
-    if (exError) throw exError;
-    alreadyDone = new Set(
-      (existing ?? []).map((e) => e.media_post_id as string)
-    );
-  }
-
-  const targets = rows.filter((r) => !alreadyDone.has(r.id));
-  if (targets.length === 0) {
     return {
       analyzed: 0,
-      skipped: rows.length,
+      skipped: 0,
+      remaining: 0,
       model: null,
       inputTokens: null,
       outputTokens: null,
+      imagesAnalyzed: 0,
+    };
+  }
+
+  const idByExternal = new Map<string, string>(); // external_media_id → media_post.id
+  for (const r of rows) idByExternal.set(r.external_media_id, r.id);
+
+  // 2) reanalyze=true: 이 계정의 기존 분석을 **한 번 전체 리셋**한 뒤 증분처럼 진행한다.
+  //    (반복 호출 시 첫 호출만 reanalyze=true 로 와서 1회 리셋 → 이후 증분으로 남은 청크 처리.)
+  if (opts.reanalyze) {
+    const { error: resetError } = await admin
+      .from(ANALYSIS)
+      .delete()
+      .in("media_post_id", [...idByExternal.values()]);
+    if (resetError) throw resetError;
+  }
+
+  // 3) 증분: 이미 분석된 media_post_id 집합(리셋 직후면 비어 있음).
+  const { data: existing, error: exError } = await admin
+    .from(ANALYSIS)
+    .select("media_post_id")
+    .in("media_post_id", [...idByExternal.values()]);
+  if (exError) throw exError;
+  const alreadyDone = new Set(
+    (existing ?? []).map((e) => e.media_post_id as string)
+  );
+
+  // 미분석 전체 → 이번 호출은 limit 개만 처리(나머지는 remaining 으로 알려 클라가 반복).
+  const allTargets = rows.filter((r) => !alreadyDone.has(r.id));
+  const alreadyAnalyzed = rows.length - allTargets.length;
+  const limit =
+    typeof opts.limit === "number" && opts.limit > 0
+      ? opts.limit
+      : allTargets.length;
+  const targets = allTargets.slice(0, limit);
+  const remaining = allTargets.length - targets.length;
+
+  if (targets.length === 0) {
+    return {
+      analyzed: 0,
+      skipped: alreadyAnalyzed,
+      remaining: 0,
+      model: null,
+      inputTokens: null,
+      outputTokens: null,
+      imagesAnalyzed: 0,
     };
   }
 
@@ -113,10 +158,13 @@ export async function analyzeTrackedAccount(
       likeCount: m?.like_count ?? null,
       commentsCount: m?.comments_count ?? null,
       postedAt: r.posted_at,
+      imageUrl: imageUrlForRow(r),
     };
   });
 
-  const { results, model, usage } = await analyzeContent(posts);
+  const { results, model, usage, imagesAnalyzed } = await analyzeContent(posts, {
+    vision: opts.vision,
+  });
 
   // 4) 적재 — 멱등: 대상 media_post 의 기존 분석을 지우고 새로 삽입(재분석 중복 방지).
   const rowsToInsert = results
@@ -132,6 +180,7 @@ export async function analyzeTrackedAccount(
         tone: a.tone || null,
         summary: a.summary || null,
         keywords: a.keywords,
+        visual_notes: a.visualNotes || null,
       };
     })
     .filter((r): r is NonNullable<typeof r> => r !== null);
@@ -150,9 +199,11 @@ export async function analyzeTrackedAccount(
 
   return {
     analyzed: rowsToInsert.length,
-    skipped: rows.length - targets.length,
+    skipped: alreadyAnalyzed,
+    remaining,
     model,
     inputTokens: usage.inputTokens,
     outputTokens: usage.outputTokens,
+    imagesAnalyzed,
   };
 }

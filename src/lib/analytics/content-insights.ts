@@ -20,12 +20,16 @@ export type ContentAnalysisRow = {
   tone: string | null;
   summary: string | null;
   keywords: string[];
+  /** 이미지 시각 요소 분석(D-022). 캡션만 분석된 게시물은 null. */
+  visualNotes: string | null;
 };
 
 export type FreqItem = { label: string; count: number };
 
 export type ContentInsights = {
   analyzedPosts: number;
+  /** 이미지(시각 요소)까지 분석된 게시물 수(D-022). */
+  visualAnalyzedPosts: number;
   /** 마지막 분석 시각(ISO). 없으면 null. */
   lastAnalyzedAt: string | null;
   /** 사용 모델(가장 최근). */
@@ -81,8 +85,13 @@ export function computeContentInsights(
     }
   }
 
+  const visualAnalyzedPosts = rows.filter(
+    (r) => (r.visualNotes ?? "").trim().length > 0
+  ).length;
+
   return {
     analyzedPosts: rows.length,
+    visualAnalyzedPosts,
     lastAnalyzedAt,
     model,
     appealPoints,

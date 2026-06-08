@@ -70,6 +70,16 @@ export function getMetaGraphVersion(): string {
 // 모델 교체/사용자 선택을 위해 env 로 프로바이더·모델을 결정한다(D-016).
 // =====================================================================
 
+/**
+ * 이미지 비전 분석 사용 여부(D-022). 기본 ON.
+ * 비용(이미지 토큰)·페이로드를 줄이려면 AI_VISION=off|false|0 으로 끈다.
+ * (프로바이더가 비전 미지원이면 이 값과 무관하게 캡션만 분석됨)
+ */
+export function getVisionEnabled(): boolean {
+  const v = (process.env.AI_VISION ?? "").toLowerCase();
+  return !(v === "off" || v === "false" || v === "0");
+}
+
 /** 활성 AI 프로바이더. 미설정 시 gemini. (향후 'claude' 추가) */
 export function getAIProviderName(): "gemini" {
   const p = (process.env.AI_PROVIDER || "gemini").toLowerCase();

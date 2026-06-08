@@ -30,6 +30,7 @@ type AnalysisRow = {
   tone: string | null;
   summary: string | null;
   keywords: unknown;
+  visual_notes: string | null;
 };
 
 type MediaRow = {
@@ -98,7 +99,7 @@ export async function GET(req: Request) {
     .select(
       `external_media_id, permalink, caption, posted_at,
        metrics:${METRICS}(captured_at, like_count, comments_count),
-       analysis:${ANALYSIS}(model, analyzed_at, topic, appeal_points, format, tone, summary, keywords)`
+       analysis:${ANALYSIS}(model, analyzed_at, topic, appeal_points, format, tone, summary, keywords, visual_notes)`
     )
     .eq("tracked_account_id", id)
     .order("posted_at", { ascending: false });
@@ -128,6 +129,7 @@ export async function GET(req: Request) {
         tone: a.tone,
         summary: a.summary,
         keywords: asStringArray(a.keywords),
+        visualNotes: a.visual_notes,
       } satisfies ContentAnalysisRow;
     })
     .filter((r): r is ContentAnalysisRow => r !== null);

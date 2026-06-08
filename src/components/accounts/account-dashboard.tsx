@@ -160,12 +160,19 @@ export function AccountDashboard({ id }: { id: string }) {
           <h1 className="text-xl font-semibold tracking-tight">
             @{account.username}
           </h1>
-          <Badge variant="secondary">
+          <Badge
+            variant={account.account_kind === "owned" ? "default" : "secondary"}
+            className={
+              account.account_kind === "owned"
+                ? "bg-emerald-600 text-white"
+                : undefined
+            }
+          >
             {account.account_kind === "competitor"
               ? "경쟁사"
               : account.account_kind === "influencer"
                 ? "인플루언서"
-                : "위임"}
+                : "내 계정"}
           </Badge>
         </div>
         {snapshot?.biography && (
@@ -252,6 +259,37 @@ export function AccountDashboard({ id }: { id: string }) {
               }
             />
           </div>
+
+          {/* 내 계정 전용 — 노출·도달·저장·조회 (delegated) */}
+          {account.access_tier === "delegated" &&
+            (metrics.avgReach != null ||
+              metrics.avgImpressions != null ||
+              metrics.avgSaved != null) && (
+              <Card className="border-emerald-600/30">
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    내 계정 인사이트 (노출·도달)
+                  </CardTitle>
+                  <CardDescription>
+                    본인 계정만 볼 수 있는 비공개 지표. 게시물 평균 기준.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <StatCard label="평균 도달" value={fmt(metrics.avgReach)} />
+                    <StatCard
+                      label="평균 노출"
+                      value={fmt(metrics.avgImpressions)}
+                    />
+                    <StatCard label="평균 저장" value={fmt(metrics.avgSaved)} />
+                    <StatCard
+                      label="평균 조회"
+                      value={fmt(metrics.avgVideoViews)}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
           {/* 참여율 등급 (규모 보정) */}
           <Card>
@@ -411,6 +449,11 @@ export function AccountDashboard({ id }: { id: string }) {
                       <span className="flex items-center gap-1">
                         <MessageCircle className="size-3" /> {fmt(p.commentsCount)}
                       </span>
+                      {p.reach != null && (
+                        <span className="flex items-center gap-1">
+                          <Users className="size-3" /> 도달 {fmt(p.reach)}
+                        </span>
+                      )}
                       {p.postedAt && (
                         <span>
                           {new Date(p.postedAt).toLocaleDateString("ko-KR", {
@@ -438,8 +481,10 @@ export function AccountDashboard({ id }: { id: string }) {
           </Card>
 
           <p className="text-muted-foreground flex items-center gap-1 text-xs">
-            <Users className="size-3" /> 외부 공개지표 기준 — 노출·도달은 포함되지
-            않습니다.
+            <Users className="size-3" />{" "}
+            {account.access_tier === "delegated"
+              ? "내 계정 — 공개지표 + 노출·도달 인사이트 포함."
+              : "외부 공개지표 기준 — 노출·도달은 포함되지 않습니다."}
           </p>
         </>
       )}

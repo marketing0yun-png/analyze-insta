@@ -35,13 +35,13 @@ const phases = [
     n: "2.5",
     title: "매장 비교 분석",
     desc: "참여율 순위 + 매장 선택 → 정량 비교표 + LLM 냉정 평가.",
-    state: "current" as const,
+    state: "done" as const,
   },
   {
     n: 3,
-    title: "위임계정 완전분석 + 비교 + 배포",
-    desc: "노출·도달 인사이트, 노출·도달 비교 보강, 구글 로그인 전환.",
-    state: "later" as const,
+    title: "내 계정 완전분석 + 비교 + 배포",
+    desc: "내 계정 노출·도달 인사이트 수집·비교, 일괄·일일캐시. (배포 잔여: 마스터·구글로그인)",
+    state: "current" as const,
   },
 ];
 
@@ -61,7 +61,7 @@ export default function Home() {
             <TrendingUp className="size-5" />
           </span>
           <Badge variant="outline" className="gap-1">
-            <Activity className="size-3" /> Phase 2.5
+            <Activity className="size-3" /> Phase 3
           </Badge>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">

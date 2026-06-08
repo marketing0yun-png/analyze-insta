@@ -51,6 +51,8 @@ type CompareSummary = {
   avgComments: number | null;
   postsPerWeek: number | null;
   analyzedPosts: number;
+  avgReach: number | null;
+  avgImpressions: number | null;
   topFormats: { label: string; pct: number }[];
   appealPoints: { label: string; count: number }[];
 };
@@ -77,8 +79,13 @@ type CompareResponse = { accounts: CompareSummary[]; report: ComparisonReport };
 const KIND_LABEL: Record<RankItem["account_kind"], string> = {
   competitor: "경쟁사",
   influencer: "인플루언서",
-  owned: "우리매장",
+  owned: "내 계정",
 };
+
+/** 비교 대상 중 내 계정(노출·도달 보유)이 하나라도 있으면 도달 열을 표시. */
+function hasOwnedInsights(accounts: CompareSummary[]): boolean {
+  return accounts.some((a) => a.avgReach != null || a.avgImpressions != null);
+}
 
 function fmt(n: number | null | undefined): string {
   if (n == null) return "—";
@@ -175,7 +182,7 @@ export function CompareView() {
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
           참여율 순으로 정렬됩니다. 비교할 매장을 2~5개 선택하면 LLM이 냉정하게
-          평가합니다. (공개지표 기준 — 노출·도달 제외)
+          평가합니다. (외부는 공개지표, 내 계정은 노출·도달까지 포함)
         </p>
       </header>
 
@@ -368,6 +375,7 @@ function ListBlock({
 function CompareResult({ data }: { data: CompareResponse }) {
   const { report, accounts } = data;
   const summaryByUser = new Map(accounts.map((a) => [a.username, a]));
+  const showReach = hasOwnedInsights(accounts);
 
   return (
     <div className="space-y-4">
@@ -385,6 +393,11 @@ function CompareResult({ data }: { data: CompareResponse }) {
                 <th className="py-1.5 pr-2 text-right font-medium">참여율</th>
                 <th className="py-1.5 pr-2 text-center font-medium">등급</th>
                 <th className="py-1.5 pr-2 text-right font-medium">평균반응</th>
+                {showReach && (
+                  <th className="py-1.5 pr-2 text-right font-medium">
+                    평균도달<span className="text-[10px]">(내계정)</span>
+                  </th>
+                )}
                 <th className="py-1.5 pr-2 text-right font-medium">주간업로드</th>
                 <th className="py-1.5 text-right font-medium">팔로워</th>
               </tr>
@@ -413,6 +426,11 @@ function CompareResult({ data }: { data: CompareResponse }) {
                   <td className="py-1.5 pr-2 text-right">
                     {fmt((a.avgLikes ?? 0) + (a.avgComments ?? 0))}
                   </td>
+                  {showReach && (
+                    <td className="py-1.5 pr-2 text-right">
+                      {a.avgReach != null ? fmt(a.avgReach) : "—"}
+                    </td>
+                  )}
                   <td className="py-1.5 pr-2 text-right">
                     {a.postsPerWeek != null ? `${a.postsPerWeek}회` : "—"}
                   </td>
@@ -522,8 +540,8 @@ function CompareResult({ data }: { data: CompareResponse }) {
           })}
 
           <p className="text-muted-foreground text-xs">
-            공개지표·콘텐츠 전략 기준 평가입니다. 노출·도달·조회수는 포함되지
-            않습니다.
+            공개지표·콘텐츠 전략 기준 평가입니다. 노출·도달은 <strong>내 계정</strong>
+            에만 포함되며, 외부 계정은 추정하지 않습니다.
           </p>
         </CardContent>
       </Card>

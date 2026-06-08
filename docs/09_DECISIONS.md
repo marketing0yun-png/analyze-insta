@@ -137,6 +137,29 @@
 - **변경 여지:** 위임 계정 노출·도달을 포함한 완전 비교(Phase 3). 카테고리 단위 자동 비교(우리 vs 카테고리 평균). 사용자 라벨('우리/벤치마크') 보강.
 - **날짜:** 2026-06-08
 
+## D-022. 이미지 비전 분석 = 프로바이더 인터페이스 멀티모달 확장(인라인 base64) + visualNotes
+- **결정:** D-020의 후속(이미지 비전)을 구현. AI 프로바이더 인터페이스를 텍스트 전용에서 **멀티모달**로 확장 — `GenerateTextOptions.images?: ImagePart[]`(인라인 base64) + `AIProvider.supportsVision`. 콘텐츠 분석 시 게시물 이미지를 캡션과 함께 넘겨 `ContentAnalysis.visualNotes`(시각 요소: 피사체·제품·연출·색감·구도·텍스트오버레이)를 추가로 뽑는다. `content_analysis.visual_notes` 컬럼 신설(마이그레이션 `20260608000001_vision.sql`).
+- **이유(인라인 base64):** Vertex AI 의 Gemini 는 임의 HTTP URL 을 직접 fetch 하지 못하고(gs:// 만), 인스타 CDN URL 은 만료된다 → 서버에서 바이트를 받아 base64 인라인으로 전달(`lib/ai/fetch-image.ts`). 모델 중립을 위해 `ImagePart{mimeType,data}` 만 인터페이스에 둔다(Claude 등도 동일 형태로 매핑 가능).
+- **이미지 소스:** image/carousel = `media_url`(이미지). video/reel = `raw.thumbnail_url`(Business Discovery `thumbnail_url` 필드 추가, 정지 썸네일) — 비디오 `media_url` 은 동영상 파일이라 인라인 비전 불가. 썸네일 없으면 그 게시물은 **캡션만** 분석(graceful). 기존 수집분은 thumbnail_url 이 없으니 **재수집해야 비디오 비전이 채워짐**.
+- **청크 내 매칭:** 청크(10개) 중 이미지가 있는 게시물만 1-based 첨부 순번을 부여하고 프롬프트의 `[이미지] 첨부됨 — N번째` 마커로 모델이 이미지↔게시물을 연결(일부만 이미지가 있어도 견고). fetch 실패/타입 불일치/상한(4MB) 초과는 null 로 흡수해 분석을 막지 않는다.
+- **비용 제어:** 이미지는 토큰 비용이 크므로 **env 킬스위치 `AI_VISION`(기본 ON)** + 요청별 `vision` 플래그로 끌 수 있다. provider 가 비전 미지원이면 값과 무관하게 캡션만 분석. 분석 결과에 `imagesAnalyzed`(실제 첨부된 이미지 수) 반환해 모니터링.
+- **변경 여지:** sharp 등으로 업로드 전 리사이즈(현재는 4MB 상한 스킵만). 캐러셀 다중 이미지(현재 커버 1장). 비교(2.5) 프롬프트에 시각 인사이트 집계 주입. Claude provider 의 비전 매핑.
+- **날짜:** 2026-06-08
+
+## D-023. 내 계정 완전분석(노출·도달) = 본인 ig_user_id 직접 조회 + per-media insights + 일일 캐시
+- **결정:** Phase 3 핵심을 구현. "위임/delegated" 대신 **UI 라벨을 "내 계정"(노출·도달까지) / "외부 계정"(공개지표만)** 으로 통일(DB 값 `account_kind='owned'`·`access_tier='delegated'`는 유지, 라벨만). 내 계정은 **토큰 주인 본인 계정 1개**(토큰당 1개)로 한정.
+- **수집 경로 분기:** 외부=Business Discovery(공개지표, 계정당 1콜) / 내 계정=`fetchOwnedProfile`(본인 ig_user_id 직접 노드 조회 — follows_count 포함) + 게시물마다 `fetchMediaInsights`(노출·도달·저장·조회). **내 계정은 반드시 cred.ig_user_id(본인)를 조회** — 남의 계정에 인사이트 호출 금지(인스타가 본인 계정에만 인사이트 제공, D-004). `collectOwnedAccount`가 `post_metrics`에 reach/impressions/saved/video_views/plays 적재(source='official').
+- **위임의 실제 의미(혼동 방지):** 비밀번호가 아니라 **토큰(출입증)**을 받는 것. 광고주가 본인 계정으로 직접 토큰을 발행·동의해 토큰값만 입력하면, 그 토큰으로 **본인 계정의** 노출·도달까지 조회 가능. 등록은 `POST /api/accounts/self`가 cred에서 토큰 복호화→`resolveInstagramUser`로 username 재해석→owned+delegated로 insert(또는 기존 행 승격). 이렇게 ig_user_id 일치를 보장.
+- **레이트리밋/페이싱:** 외부 1콜은 무시할 수준 → 일괄 시 계정 사이 0.5s(클라). 내 계정은 게시물 수만큼 인사이트 콜이 나가 버스트 → per-media 0.25s 페이싱(`OWNED_INSIGHT_DELAY_MS`). 인사이트 호출은 종류별 지표셋 시도→실패 시 최소셋(reach,saved) 폴백→그래도 실패면 공개지표만(throw 안 함). `monitorRateLimit` 헤더 경고 유지.
+- **일괄 + 일일 캐시:** 목록 체크박스 + 전체선택 + **"선택 수집 & 분석"**(클라가 계정별 `/collect`→`/analyze` 순차 호출 → Vercel 60초/요청 한도 회피). **일일 캐시:** 최신 스냅샷 `captured_at >= 오늘 0시(KST)`면 `/collect`가 Meta 호출 없이 `{cached:true}` 반환(AI 토큰·API 쿼터 절약). **"강제 갱신"** 체크박스가 `force:true`로 캐시 무시(새 게시물 즉시 반영). 분석은 기존 증분이라 새 게시물 없으면 비용 0.
+- **분석 60초 한도(핵심 함정):** 게시물 30개를 한 요청에서 분석하면 ~100초(비전 포함)로 **Vercel 60초/요청 한도에 걸린다(로컬은 한도 없어 통과하므로 못 느낌)**. → `/analyze`를 **한 요청당 10개(=content-analysis CHUNK_SIZE)** 만 처리하고 `remaining` 반환, **클라 공용 헬퍼(`lib/client/analyze-loop.ts`)가 remaining 0 될 때까지 반복 호출**. 각 요청 ~35초로 한도 내. **퀄리티 동일**(AI는 원래도 10개씩 청크 호출 — `content-analysis.ts` CHUNK_SIZE=10, 청크 간 컨텍스트 공유 없음 → HTTP 요청을 쪼개도 입력이 동일). `reanalyze`는 첫 호출만 보내 서버가 **1회 전체 리셋** 후 증분으로 남은 청크 처리. 일괄·인사이트 탭 양쪽이 같은 헬퍼 사용.
+- **분석중 UX/ETA:** "분석중" 인지가 쉽도록 진행 배너(계정 N/M + 게시물 done/total + 진행바 + 예상 남은 시간)와 **시작 전 안내**(계정당 약 100~120초, 예상 총합, "탭 닫지 마세요" confirm) 제공. ETA는 계정당 ~110초·청크당 ~35초 경험치. 한계: 클라 orchestrate라 **탭을 닫으면 중단**(완료분은 저장) → 진짜 백그라운드는 Edge Function(D-015) 후속.
+- **비교/대시보드 보강:** `account-metrics`에 avgReach/avgImpressions/avgSaved/avgVideoViews(값 있는 게시물만 평균, 외부=null) + TopPost에 reach/impressions. 대시보드는 delegated일 때 "내 계정 인사이트(노출·도달)" 카드. 비교는 `CompareSummary.avgReach/avgImpressions`(내 계정만 채움) + 프롬프트에 "노출·도달은 내 계정에만 — 외부는 추정 금지" + 정량표 도달 열(내 계정만).
+- **마이그레이션 0:** `post_metrics`에 reach/impressions/saved/video_views/plays/profile_visits, snapshots에 follows_count, enum에 owned/delegated가 이미 존재(D-010 init) → **스키마 변경 없이 채우기만**.
+- **범위(이번):** 내 계정 인사이트 + 일괄/캐시 + 비교 보강까지. **마스터 콘솔·구글 로그인·Meta 앱 검수는 후속**(검수는 휴대폰 인증 보류로 외부 차단).
+- **변경 여지:** 중첩 필드(`media{insights.metric(...)}`)로 인사이트 호출 1~2회로 축소(종류별 지표 차이로 fragile, 현재는 개별+폴백). 계정 인사이트(period 기반 reach·profile_views). 배치 수집 Edge Function 분리(D-015).
+- **날짜:** 2026-06-08
+
 ---
 ## 미해결/추후 결정
 - [ ] 로그인 프로바이더 최종 확정(구글 단독 vs 구글+카카오) — 현재 구글 우선 가정.

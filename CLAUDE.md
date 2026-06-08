@@ -35,14 +35,15 @@
 4. **Phase 4** 서드파티 PoC → 외부 경쟁사 조회수·댓글내용 보강
 
 ## 현재 상태
-- **Phase 1 + Phase 2(콘텐츠 분석) + Phase 2.5(매장 비교) 구현 완료(로컬) — 사용자 검수 단계.** `npm run build`/lint 통과.
+- **Phase 1 + Phase 2(콘텐츠 분석) + Phase 2.5(매장 비교) + Phase 3 핵심(내 계정 노출·도달) 구현 완료(로컬) — 사용자 검수 단계.** `npm run build`/lint 통과.
+- **Phase 3 핵심 흐름(D-023):** UI 라벨 **내 계정/외부 계정** 통일. **내 계정**(토큰 주인 본인 1개)은 "내 계정 분석 추가"(`/api/accounts/self`, owned+delegated) 등록 → 수집 시 `fetchOwnedProfile`+`fetchMediaInsights`(per-media 0.25s, 종류별 지표셋·폴백)로 **노출·도달·저장·조회**까지 `post_metrics` 적재(`collectOwnedAccount`, 수집 라우트 access_tier 분기). **일괄**: 목록 체크박스+전체선택+"선택 수집 & 분석"(클라 0.5s orchestrate) + **일일 캐시**(KST 0시 `/collect` `{cached}`) + **강제 갱신**. 비교/대시보드 노출·도달 보강(내 계정만, 외부 추정 금지). **마이그레이션 0**. 후속: 마스터 콘솔·구글 로그인·앱 검수.
 - Phase 1 흐름: 등록/수집(`/api/accounts`, `/api/accounts/collect`, `lib/meta/collect.ts`) → 지표/대시보드(`lib/analytics/account-metrics.ts`, `/api/accounts/metrics`, `/accounts/[id]` Recharts) → 해시태그(`lib/meta/hashtag.ts` 7일 롤링 30개 쿼터, `/api/hashtags`, `HashtagCard`).
-- Phase 2 흐름: 캡션→AI 분석(`lib/ai/content-analysis.ts` 청크 배치, `lib/ai/analyze-account.ts` 증분/재분석, `/api/accounts/analyze`)→`content_analysis` 적재→대시보드 "콘텐츠 인사이트" 탭(소구점/톤/포맷/키워드/게시물별, `/api/accounts/insights`, `lib/analytics/content-insights.ts`). 이미지 비전은 후속(멀티모달 provider). 상세 D-019/D-020.
+- Phase 2 흐름: 캡션 **+ 이미지 비전(D-022)**→AI 분석(`lib/ai/content-analysis.ts` 청크 배치, `lib/ai/analyze-account.ts` 증분/재분석, `/api/accounts/analyze`)→`content_analysis`(+`visual_notes`) 적재→대시보드 "콘텐츠 인사이트" 탭(소구점/톤/포맷/키워드/게시물별+비주얼 노트, `/api/accounts/insights`, `lib/analytics/content-insights.ts`). 비전: provider 멀티모달화(`images`/`supportsVision`)+인라인 base64(`lib/ai/fetch-image.ts`), image/carousel=media_url·video/reel=thumbnail, `AI_VISION` 킬스위치(기본 ON). 상세 D-019/D-020/D-022.
 - Phase 2.5 비교: 참여율 자동순위(`/api/accounts/ranking`, 공용 로더 `lib/server/account-report.ts`) + 2~5개 매장 → 정량표 + LLM 냉정 평가(`lib/ai/compare-accounts.ts`, `/api/accounts/compare`, `reports(kind='comparison')` 적재, `/compare` 화면). 노출·도달 비교는 Phase 3. 상세 D-021.
 - 적재: snapshots/media_posts/post_metrics(외부=노출·도달 null), hashtag_jobs/results, content_analysis(가공). 지표는 조회 시 계산(캐시 안 함, D-016).
 - 공용 Supabase(`nushcvgafwqosnkzlsrm`)에 `analyze_insta_*` 테이블 적용. **익명 로그인 ON + service-role 키 입력·검증 완료**.
 - **남은 블로커(비차단):** Meta 앱 `META_APP_ID/SECRET` 보류 — 없어도 동작(appsecret_proof·장기토큰 교환만 비활성). AI 분석은 Vertex 자격증명 필요(`/api/ai/ping` 선검증).
-- 다음 작업: Phase 2 검수 피드백 반영 → 이미지 비전(멀티모달) 또는 Phase 3 착수 판단. `docs/07_ROADMAP.md` "다음 할 일" 참조.
+- 다음 작업: Phase 2(+이미지 비전, D-022) 검수 피드백 반영 → Phase 3(위임 계정 노출·도달) 착수 판단. ⚠️ 비디오/릴스 비전은 thumbnail_url 필요 → 기존 계정 **재수집** 후 재분석. `docs/07_ROADMAP.md` "다음 할 일" 참조.
 
 ## 작업 규칙
 - 새 기능/결정을 추가하면 **반드시 관련 docs와 `docs/09_DECISIONS.md`를 갱신**한다.

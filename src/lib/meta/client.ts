@@ -175,6 +175,8 @@ export type BusinessDiscoveryMedia = {
   media_type: string | null;
   media_product_type: string | null;
   media_url: string | null;
+  /** 비디오/릴스의 정지 썸네일(이미지). 비전 분석에 사용(D-022). 이미지엔 보통 없음. */
+  thumbnail_url: string | null;
   permalink: string | null;
   timestamp: string | null;
 };
@@ -185,6 +187,8 @@ export type BusinessDiscoveryProfile = {
   name: string | null;
   biography: string | null;
   followersCount: number | null;
+  /** 팔로잉 수. Business Discovery(외부)는 미제공 → null. 내 계정 직접 조회에서만 채움. */
+  followsCount: number | null;
   mediaCount: number | null;
   profilePictureUrl: string | null;
   media: BusinessDiscoveryMedia[];
@@ -208,6 +212,7 @@ type BusinessDiscoveryResponse = {
         media_type?: string;
         media_product_type?: string;
         media_url?: string;
+        thumbnail_url?: string;
         permalink?: string;
         timestamp?: string;
       }>;
@@ -233,7 +238,7 @@ export async function fetchBusinessDiscovery(
 
   const mediaFields =
     "id,caption,like_count,comments_count,media_type," +
-    "media_product_type,media_url,permalink,timestamp";
+    "media_product_type,media_url,thumbnail_url,permalink,timestamp";
   const fields =
     `business_discovery.username(${username}){` +
     `followers_count,media_count,biography,name,username,profile_picture_url,` +
@@ -277,6 +282,7 @@ export async function fetchBusinessDiscovery(
     name: bd.name ?? null,
     biography: bd.biography ?? null,
     followersCount: bd.followers_count ?? null,
+    followsCount: null, // Business Discovery(외부)는 follows_count 미제공.
     mediaCount: bd.media_count ?? null,
     profilePictureUrl: bd.profile_picture_url ?? null,
     media: (bd.media?.data ?? []).map((m) => ({
@@ -287,9 +293,165 @@ export async function fetchBusinessDiscovery(
       media_type: m.media_type ?? null,
       media_product_type: m.media_product_type ?? null,
       media_url: m.media_url ?? null,
+      thumbnail_url: m.thumbnail_url ?? null,
       permalink: m.permalink ?? null,
       timestamp: m.timestamp ?? null,
     })),
+  };
+}
+
+// =====================================================================
+// 내 계정 완전분석 — Insights (Phase 3, D-023)
+// 토큰 주인 "본인" 계정에만 동작. 노출·도달·저장·조회 등 비공개 인사이트.
+// 외부(남의) 계정엔 인스타가 인사이트를 내어주지 않는다(D-004) → 절대 호출 금지.
+// =====================================================================
+
+type OwnedProfileResponse = {
+  id?: string;
+  username?: string;
+  name?: string;
+  biography?: string;
+  followers_count?: number;
+  follows_count?: number;
+  media_count?: number;
+  profile_picture_url?: string;
+  media?: {
+    data?: Array<{
+      id: string;
+      caption?: string;
+      like_count?: number;
+      comments_count?: number;
+      media_type?: string;
+      media_product_type?: string;
+      media_url?: string;
+      thumbnail_url?: string;
+      permalink?: string;
+      timestamp?: string;
+    }>;
+  };
+};
+
+/**
+ * 내 계정(토큰 주인 본인)의 프로필 + 최근 게시물을 **직접 노드 조회**한다.
+ * Business Discovery(외부) 와 달리 follows_count 까지 받을 수 있다.
+ * 게시물별 노출·도달은 여기 없으므로 fetchMediaInsights 로 따로 채운다.
+ */
+export async function fetchOwnedProfile(
+  token: string,
+  igUserId: string,
+  mediaLimit = 25
+): Promise<BusinessDiscoveryProfile> {
+  const mediaFields =
+    "id,caption,like_count,comments_count,media_type," +
+    "media_product_type,media_url,thumbnail_url,permalink,timestamp";
+  const fields =
+    "id,username,name,biography,followers_count,follows_count,media_count," +
+    `profile_picture_url,media.limit(${mediaLimit}){${mediaFields}}`;
+
+  const res = await graphGet<OwnedProfileResponse>(igUserId, token, { fields });
+  if (!res.id) {
+    throw new MetaApiError(
+      "내 계정 프로필을 가져오지 못했습니다. 토큰이 본인 계정에 대한 권한(instagram_basic)을 " +
+        "가지고 있는지 확인하세요.",
+      400
+    );
+  }
+
+  return {
+    igId: res.id,
+    username: res.username ?? null,
+    name: res.name ?? null,
+    biography: res.biography ?? null,
+    followersCount: res.followers_count ?? null,
+    followsCount: res.follows_count ?? null,
+    mediaCount: res.media_count ?? null,
+    profilePictureUrl: res.profile_picture_url ?? null,
+    media: (res.media?.data ?? []).map((m) => ({
+      id: m.id,
+      caption: m.caption ?? null,
+      like_count: m.like_count ?? null,
+      comments_count: m.comments_count ?? null,
+      media_type: m.media_type ?? null,
+      media_product_type: m.media_product_type ?? null,
+      media_url: m.media_url ?? null,
+      thumbnail_url: m.thumbnail_url ?? null,
+      permalink: m.permalink ?? null,
+      timestamp: m.timestamp ?? null,
+    })),
+  };
+}
+
+/** 게시물 인사이트(노출·도달·저장·조회). 외부 계정엔 절대 쓰지 않는다. */
+export type MediaInsights = {
+  reach: number | null;
+  impressions: number | null;
+  saved: number | null;
+  videoViews: number | null;
+  plays: number | null;
+};
+
+type OurMediaKind = "image" | "video" | "carousel" | "reel" | null;
+
+/**
+ * 미디어 종류별 요청 지표셋. 지원 지표가 종류·API버전마다 달라
+ * (예: 릴스는 impressions 미지원, plays 사용) 한 지표 오류로 전체가 깨질 수 있으므로
+ * fetchMediaInsights 에서 실패 시 최소셋으로 폴백한다.
+ */
+const INSIGHT_METRICS_BY_KIND: Record<string, string[]> = {
+  reel: ["reach", "saved", "plays"],
+  video: ["reach", "impressions", "saved", "video_views"],
+  image: ["reach", "impressions", "saved"],
+  carousel: ["reach", "impressions", "saved"],
+};
+
+type InsightsResponse = {
+  data?: Array<{ name?: string; values?: Array<{ value?: number }> }>;
+};
+
+/** 지표 리스트로 인사이트를 시도. 오류면 null(호출부에서 폴백). */
+async function tryMediaInsights(
+  token: string,
+  mediaId: string,
+  metrics: string[]
+): Promise<Map<string, number> | null> {
+  try {
+    const res = await graphGet<InsightsResponse>(`${mediaId}/insights`, token, {
+      metric: metrics.join(","),
+    });
+    const map = new Map<string, number>();
+    for (const row of res.data ?? []) {
+      const v = row.values?.[0]?.value;
+      if (row.name && typeof v === "number") map.set(row.name, v);
+    }
+    return map;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 게시물 하나의 노출·도달·저장·조회를 가져온다(내 계정 전용).
+ * 종류별 지표셋 → 실패 시 최소셋(reach,saved) 폴백. 전부 실패해도 throw 하지 않고
+ * 모두 null 을 돌려줘(공개지표만 적재) 수집이 한 게시물 때문에 깨지지 않게 한다.
+ */
+export async function fetchMediaInsights(
+  token: string,
+  mediaId: string,
+  mediaKind: OurMediaKind
+): Promise<MediaInsights> {
+  const wanted = INSIGHT_METRICS_BY_KIND[mediaKind ?? "image"] ?? [
+    "reach",
+    "saved",
+  ];
+  let map = await tryMediaInsights(token, mediaId, wanted);
+  if (!map) map = await tryMediaInsights(token, mediaId, ["reach", "saved"]);
+  const m = map ?? new Map<string, number>();
+  return {
+    reach: m.get("reach") ?? null,
+    impressions: m.get("impressions") ?? null,
+    saved: m.get("saved") ?? null,
+    videoViews: m.get("video_views") ?? null,
+    plays: m.get("plays") ?? null,
   };
 }
 

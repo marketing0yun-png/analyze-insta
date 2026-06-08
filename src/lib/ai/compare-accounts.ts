@@ -25,6 +25,9 @@ export type CompareSummary = {
   avgComments: number | null;
   postsPerWeek: number | null;
   analyzedPosts: number;
+  /** 내 계정(delegated)만 — 노출·도달 평균. 외부는 null(D-023). */
+  avgReach: number | null;
+  avgImpressions: number | null;
   topFormats: { label: string; pct: number }[];
   appealPoints: { label: string; count: number }[];
   tones: { label: string; count: number }[];
@@ -62,6 +65,7 @@ export function summarizeForCompare(
 ): CompareSummary {
   const m = report.metrics;
   const ins = report.insights;
+  const isOwned = report.account.access_tier === "delegated";
   return {
     username: report.account.username,
     kind: report.account.account_kind,
@@ -72,6 +76,9 @@ export function summarizeForCompare(
     avgComments: m.avgComments,
     postsPerWeek: m.postsPerWeek,
     analyzedPosts: ins.analyzedPosts,
+    // 노출·도달은 내 계정만 — 외부엔 없음(추정 금지를 위해 null 고정).
+    avgReach: isOwned ? m.avgReach : null,
+    avgImpressions: isOwned ? m.avgImpressions : null,
     topFormats: m.formats.slice(0, 3).map((f) => ({ label: f.label, pct: f.pct })),
     appealPoints: ins.appealPoints.slice(0, 6),
     tones: ins.tones.slice(0, 4),
@@ -95,7 +102,7 @@ const SYSTEM_INSTRUCTION = [
   "당신은 한국 육아용품 매장의 SNS 마케팅 전략가입니다.",
   "여러 인스타그램 계정의 공개지표·콘텐츠 전략을 비교해 **냉정하고 솔직한** 진단을 내립니다.",
   "근거 없는 칭찬은 금지하고, 약점과 개선책을 구체적으로 지적합니다.",
-  "주어진 데이터에 '노출/도달/조회수'는 없습니다 — 없는 지표를 추정·언급하지 마세요.",
+  "'노출/도달'은 '내 계정'으로 표시된 계정에만 주어집니다 — 주어지지 않은(외부) 계정엔 추정·언급하지 마세요.",
   "참여율은 **규모(팔로워) 대비 등급**으로 판단하세요. 큰 계정은 참여율이 구조적으로 낮으니,",
   "절대 수치만 보고 '낮다'고 단정하지 말고 각 계정에 주어진 등급(활발/양호/평균/다소 낮음)을 존중하세요.",
   "분석에서 끝내지 말고 **무엇을 더 시도해야 할지(구체 콘텐츠 아이디어·다음 액션)** 까지 제시하세요.",
@@ -117,11 +124,19 @@ function serialize(s: CompareSummary, rank: number, hasBenchmark: boolean): stri
       ? ", 역할: 벤치마크 목표"
       : ", 역할: 개선 대상"
     : "";
+  const isOwned = s.kind === "owned";
+  const insightLine =
+    s.avgReach != null || s.avgImpressions != null
+      ? `- 노출·도달(내 계정 전용): 평균 도달 ${fmt(s.avgReach)} / 평균 노출 ${fmt(s.avgImpressions)}`
+      : isOwned
+        ? "- 노출·도달(내 계정): 미수집"
+        : "- 노출·도달: 없음(외부 계정 — 추정 금지)";
   return [
-    `## @${s.username} (참여율 순위 ${rank}위, 유형: ${s.kind}${role})`,
+    `## @${s.username} (참여율 순위 ${rank}위, 유형: ${isOwned ? "내 계정" : s.kind}${role})`,
     `- 팔로워: ${fmt(s.followers)}`,
     `- 참여율: ${fmt(s.engagementRate)}% → 등급 "${grade.label}" (${grade.followersBand} 규모 기대치 ${grade.benchmark}%)`,
     `- 평균 좋아요/댓글: ${fmt(s.avgLikes)} / ${fmt(s.avgComments)}`,
+    insightLine,
     `- 주당 업로드: ${fmt(s.postsPerWeek)}`,
     `- 분석 게시물 수: ${s.analyzedPosts}`,
     `- 주요 포맷: ${formats}`,

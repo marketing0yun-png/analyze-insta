@@ -1,6 +1,6 @@
 import "server-only";
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, type Part } from "@google/genai";
 
 import { getVertexConfig } from "@/lib/env";
 
@@ -14,6 +14,7 @@ import { AIError, type AIResult, type GenerateTextOptions } from "../types";
  */
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini";
+  readonly supportsVision = true;
 
   private clientAndConfig() {
     const { project, location, model, maxOutputTokens, credentials } =
@@ -31,11 +32,29 @@ export class GeminiProvider implements AIProvider {
   async generateText(opts: GenerateTextOptions): Promise<AIResult> {
     const { client, model, maxOutputTokens } = this.clientAndConfig();
 
+    // 이미지가 있으면 멀티모달 contents(텍스트 + 인라인 이미지 파트)로, 없으면 문자열로. (D-022)
+    const contents =
+      opts.images && opts.images.length > 0
+        ? [
+            {
+              role: "user",
+              parts: [
+                { text: opts.prompt },
+                ...opts.images.map(
+                  (img): Part => ({
+                    inlineData: { mimeType: img.mimeType, data: img.data },
+                  })
+                ),
+              ],
+            },
+          ]
+        : opts.prompt;
+
     let res;
     try {
       res = await client.models.generateContent({
         model,
-        contents: opts.prompt,
+        contents,
         config: {
           systemInstruction: opts.system,
           temperature: opts.temperature,

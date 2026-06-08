@@ -45,6 +45,10 @@ type MetricRow = {
   captured_at: string;
   like_count: number | null;
   comments_count: number | null;
+  reach: number | null;
+  impressions: number | null;
+  saved: number | null;
+  video_views: number | null;
 };
 
 type AnalysisRow = {
@@ -56,6 +60,7 @@ type AnalysisRow = {
   tone: string | null;
   summary: string | null;
   keywords: unknown;
+  visual_notes: string | null;
 };
 
 type MediaRow = {
@@ -112,8 +117,8 @@ export async function loadAccountReport(
     .from(MEDIA)
     .select(
       `external_media_id, permalink, caption, media_type, posted_at,
-       metrics:${METRICS}(captured_at, like_count, comments_count),
-       analysis:${ANALYSIS}(model, analyzed_at, topic, appeal_points, format, tone, summary, keywords)`
+       metrics:${METRICS}(captured_at, like_count, comments_count, reach, impressions, saved, video_views),
+       analysis:${ANALYSIS}(model, analyzed_at, topic, appeal_points, format, tone, summary, keywords, visual_notes)`
     )
     .eq("tracked_account_id", id)
     .order("posted_at", { ascending: false });
@@ -131,6 +136,10 @@ export async function loadAccountReport(
       postedAt: m.posted_at,
       likeCount: latest?.like_count ?? null,
       commentsCount: latest?.comments_count ?? null,
+      reach: latest?.reach ?? null,
+      impressions: latest?.impressions ?? null,
+      saved: latest?.saved ?? null,
+      videoViews: latest?.video_views ?? null,
     };
   });
 
@@ -154,6 +163,7 @@ export async function loadAccountReport(
         tone: a.tone,
         summary: a.summary,
         keywords: asStringArray(a.keywords),
+        visualNotes: a.visual_notes,
       } satisfies ContentAnalysisRow;
     })
     .filter((r): r is ContentAnalysisRow => r !== null);

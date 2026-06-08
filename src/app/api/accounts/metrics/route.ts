@@ -20,6 +20,10 @@ type MetricRow = {
   captured_at: string;
   like_count: number | null;
   comments_count: number | null;
+  reach: number | null;
+  impressions: number | null;
+  saved: number | null;
+  video_views: number | null;
 };
 
 type MediaRow = {
@@ -84,7 +88,7 @@ export async function GET(req: Request) {
     .from(MEDIA)
     .select(
       `external_media_id, permalink, caption, media_type, posted_at,
-       metrics:${METRICS}(captured_at, like_count, comments_count)`
+       metrics:${METRICS}(captured_at, like_count, comments_count, reach, impressions, saved, video_views)`
     )
     .eq("tracked_account_id", id)
     .order("posted_at", { ascending: false });
@@ -103,6 +107,10 @@ export async function GET(req: Request) {
       postedAt: m.posted_at,
       likeCount: latest?.like_count ?? null,
       commentsCount: latest?.comments_count ?? null,
+      reach: latest?.reach ?? null,
+      impressions: latest?.impressions ?? null,
+      saved: latest?.saved ?? null,
+      videoViews: latest?.video_views ?? null,
     };
   });
 

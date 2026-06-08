@@ -4,12 +4,17 @@ import * as React from "react";
 import {
   ExternalLink,
   Heart,
+  Image as ImageIcon,
   Loader2,
   MessageCircle,
   Sparkles,
 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import {
+  type AnalyzeProgress,
+  analyzeAccountLooped,
+} from "@/lib/client/analyze-loop";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,12 +32,6 @@ import type {
 type InsightsResponse = {
   account: { id: string; username: string };
   insights: Insights;
-};
-
-type AnalyzeResult = {
-  analyzed: number;
-  skipped: number;
-  model: string | null;
 };
 
 function fmt(n: number | null | undefined): string {
@@ -92,6 +91,7 @@ export function ContentInsights({ id }: { id: string }) {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [analyzing, setAnalyzing] = React.useState(false);
+  const [prog, setProg] = React.useState<AnalyzeProgress | null>(null);
   const [note, setNote] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
@@ -126,29 +126,26 @@ export function ContentInsights({ id }: { id: string }) {
     setAnalyzing(true);
     setNote(null);
     setError(null);
-    try {
-      const res = await fetch("/api/accounts/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, reanalyze }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "분석 실패");
-        return;
-      }
-      const r = json.result as AnalyzeResult;
+    setProg(null);
+    // 분석은 60초/요청 한도를 피해 청크로 반복 호출된다(D-023).
+    const r = await analyzeAccountLooped(id, {
+      reanalyze,
+      onProgress: setProg,
+    });
+    if (r.error) {
+      setError(r.error);
+    } else {
       setNote(
         r.analyzed > 0
-          ? `분석 완료 · 새로 ${r.analyzed}개 분석${r.skipped > 0 ? ` (기존 ${r.skipped}개 건너뜀)` : ""}`
-          : `새로 분석할 게시물이 없습니다${r.skipped > 0 ? ` (이미 ${r.skipped}개 분석됨)` : ""}.`
+          ? `분석 완료 · 새로 ${r.analyzed}개 분석${
+              r.imagesAnalyzed > 0 ? ` (이미지 ${r.imagesAnalyzed}장 포함)` : ""
+            }${r.alreadyAnalyzed > 0 ? ` · 기존 ${r.alreadyAnalyzed}개 건너뜀` : ""}`
+          : `새로 분석할 게시물이 없습니다${r.alreadyAnalyzed > 0 ? ` (이미 ${r.alreadyAnalyzed}개 분석됨)` : ""}.`
       );
       setData(await load());
-    } catch {
-      setError("분석 중 오류가 발생했습니다.");
-    } finally {
-      setAnalyzing(false);
     }
+    setProg(null);
+    setAnalyzing(false);
   }
 
   if (authStatus !== "ready" || loading) {
@@ -203,6 +200,30 @@ export function ContentInsights({ id }: { id: string }) {
         )}
       </div>
 
+      {analyzing && (
+        <div className="border-primary/40 bg-primary/5 space-y-1.5 rounded-md border p-3">
+          <p className="flex items-center gap-2 text-sm font-medium">
+            <Loader2 className="text-primary size-4 animate-spin" />
+            {prog && prog.total > 0
+              ? `분석 중… ${prog.done}/${prog.total}개`
+              : "분석 준비 중…"}
+          </p>
+          {prog && prog.total > 0 && (
+            <>
+              <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
+                <div
+                  className="bg-primary h-full rounded-full transition-all"
+                  style={{ width: `${(prog.done / prog.total) * 100}%` }}
+                />
+              </div>
+              <p className="text-muted-foreground text-xs">
+                약 {Math.max(0, Math.ceil((prog.total - prog.done) / 10) * 35)}초
+                남음 · 탭을 닫지 마세요.
+              </p>
+            </>
+          )}
+        </div>
+      )}
       {note && <p className="text-muted-foreground text-xs">{note}</p>}
       {error && (
         <div className="text-destructive border-destructive/30 rounded-md border p-3 text-sm">
@@ -215,7 +236,7 @@ export function ContentInsights({ id }: { id: string }) {
           <CardContent className="text-muted-foreground py-8 text-center text-sm">
             아직 AI 콘텐츠 분석이 없습니다.{" "}
             <Sparkles className="inline size-3" /> <strong>AI 분석 실행</strong>
-            을 눌러 캡션·포맷을 분석하세요.
+            을 눌러 캡션·이미지·포맷을 분석하세요.
           </CardContent>
         </Card>
       ) : (
@@ -269,7 +290,17 @@ export function ContentInsights({ id }: { id: string }) {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">게시물별 분석</CardTitle>
-              <CardDescription>최신순. 주제·소구점·톤.</CardDescription>
+              <CardDescription>
+                최신순. 주제·소구점·톤
+                {data.visualAnalyzedPosts > 0 && (
+                  <>
+                    {" · "}
+                    <ImageIcon className="inline size-3" /> 이미지 분석{" "}
+                    {data.visualAnalyzedPosts}개
+                  </>
+                )}
+                .
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {data.posts.map((p) => (
@@ -299,6 +330,12 @@ export function ContentInsights({ id }: { id: string }) {
                   </div>
                   {p.summary && (
                     <p className="text-muted-foreground text-xs">{p.summary}</p>
+                  )}
+                  {p.visualNotes && p.visualNotes.trim() && (
+                    <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
+                      <ImageIcon className="mt-0.5 size-3 shrink-0" />
+                      <span>{p.visualNotes}</span>
+                    </p>
                   )}
                   {p.appealPoints.length > 0 && (
                     <div className="flex flex-wrap gap-1">

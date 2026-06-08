@@ -35,6 +35,10 @@ yarn-error.log*
 .env.*
 !.env.example
 
+# Claude Code 로컬 설정 (시크릿/키가 명령 허용목록에 들어갈 수 있어 커밋 금지). 스킬은 추적.
+.claude/settings.json
+.claude/settings.local.json
+
 # supabase 로컬 산출물
 /supabase/.branches
 /supabase/.temp
