@@ -7,6 +7,11 @@ import { analyzeTrackedAccount } from "@/lib/ai/analyze-account";
 import { getVisionEnabled } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import {
+  getMeterStatus,
+  meterBlockedMessage,
+  recordUsage,
+} from "@/lib/server/usage-meter";
 
 /** Vertex 인증(google-auth-library) → Node 런타임 강제. */
 export const runtime = "nodejs";
@@ -36,10 +41,19 @@ export async function POST(req: Request) {
   }
 
   const body = (await req.json().catch(() => null)) as
-    | { id?: unknown; reanalyze?: unknown; vision?: unknown; limit?: unknown }
+    | {
+        id?: unknown;
+        reanalyze?: unknown;
+        vision?: unknown;
+        limit?: unknown;
+        first?: unknown;
+      }
     | null;
   const id = typeof body?.id === "string" ? body.id : "";
   const reanalyze = body?.reanalyze === true;
+  // 청크 반복(D-023)의 첫 호출만 LLM 미터를 소비한다(계정 1개 분석 = LLM 1회).
+  // 연속 청크(first:false)는 같은 논리적 분석이라 추가 차감 안 함. 미지정이면 첫 호출로 간주.
+  const first = body?.first !== false;
   // 명시값(요청) > 서버 기본(env). 비전 끄려면 vision:false.
   const vision = typeof body?.vision === "boolean" ? body.vision : getVisionEnabled();
   // 한 요청에 처리할 게시물 수. Vercel 60초/요청 한도 회피를 위해 기본 10개씩 쪼개
@@ -66,11 +80,29 @@ export async function POST(req: Request) {
 
   try {
     const admin = createAdminClient();
+
+    // 사용량 미터(D-024): LLM 풀(분석·비교 공용)을 첫 청크에서만 확인. 막혔으면 시작 자체를 차단.
+    if (first) {
+      const meter = await getMeterStatus(admin, user.id, "llm");
+      if (!meter.allowed) {
+        return NextResponse.json(
+          { error: meterBlockedMessage(meter), meter },
+          { status: 429 }
+        );
+      }
+    }
+
     const result = await analyzeTrackedAccount(admin, id, {
       reanalyze,
       vision,
       limit,
     });
+
+    // 첫 청크에서 실제로 분석이 일어났을 때만 1칸 소비(이미 전부 분석된 no-op 은 무과금).
+    if (first && result.analyzed > 0) {
+      await recordUsage(admin, user.id, "llm");
+    }
+
     return NextResponse.json({ ok: true, result }, { status: 200 });
   } catch (err) {
     if (err instanceof AIError) {

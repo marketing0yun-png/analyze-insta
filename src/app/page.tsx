@@ -4,6 +4,7 @@ import { AccountsCard } from "@/components/accounts/accounts-card";
 import { ConnectCard } from "@/components/credentials/connect-card";
 import { HashtagCard } from "@/components/hashtags/hashtag-card";
 import { SetupStatus } from "@/components/setup-status";
+import { UsageMeterCard } from "@/components/usage/usage-meter-card";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -46,8 +47,8 @@ const phases = [
   {
     n: "3.5",
     title: "프리미엄 티어 + 사용량 미터",
-    desc: "베타 무료 운영(비용 방어) + 개인 토큰 발급 유도. 2시간 슬라이딩 한도, 해시태그 신청.",
-    state: "later" as const,
+    desc: "2시간 슬라이딩 한도(수집·지표 / 분석·비교) + 카운트다운 미터 구현. 잔여: 오너 토큰 폴백·개수 한도·안내 문구.",
+    state: "current" as const,
   },
 ];
 
@@ -82,6 +83,7 @@ export default function Home() {
       <section className="mb-8 space-y-3">
         <SetupStatus />
         <ConnectCard />
+        <UsageMeterCard />
         <AccountsCard />
         <HashtagCard />
       </section>

@@ -22,6 +22,7 @@ import {
   SEC_PER_CHUNK,
   analyzeAccountLooped,
 } from "@/lib/client/analyze-loop";
+import { USAGE_REFRESH_EVENT } from "@/components/usage/usage-meter-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -257,6 +258,8 @@ export function AccountsCard() {
       setNote(id, "수집 중 오류");
     } finally {
       setBusyId(null);
+      // 미터 카드 즉시 갱신(수집 1회 소비 반영).
+      window.dispatchEvent(new Event(USAGE_REFRESH_EVENT));
     }
   }
 
@@ -383,11 +386,14 @@ export function AccountsCard() {
               (ar.alreadyAnalyzed ? ` (기존 ${ar.alreadyAnalyzed}개)` : "")
           );
         }
+        // 계정 1건 끝날 때마다 미터 갱신(수집·분석 소비분 반영).
+        window.dispatchEvent(new Event(USAGE_REFRESH_EVENT));
         await sleep(500);
       }
     } finally {
       setBatchRunning(false);
       setProgress(null);
+      window.dispatchEvent(new Event(USAGE_REFRESH_EVENT));
     }
   }
 

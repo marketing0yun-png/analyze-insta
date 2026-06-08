@@ -10,6 +10,11 @@ import {
   summarizeForCompare,
 } from "@/lib/ai/compare-accounts";
 import { loadAccountReport } from "@/lib/server/account-report";
+import {
+  getMeterStatus,
+  meterBlockedMessage,
+  recordUsage,
+} from "@/lib/server/usage-meter";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -93,12 +98,24 @@ export async function POST(req: Request) {
       );
     }
 
+    // 사용량 미터(D-024): LLM 풀(분석·비교 공용). 비교 1회 = 1칸. 두 티어 모두 제한.
+    const admin = createAdminClient();
+    const meter = await getMeterStatus(admin, user.id, "llm");
+    if (!meter.allowed) {
+      return NextResponse.json(
+        { error: meterBlockedMessage(meter), meter },
+        { status: 429 }
+      );
+    }
+
     // 2) LLM 냉정 평가.
     const report = await compareAccounts(summaries);
     const rankedSummaries = rankByEngagement(summaries);
 
+    // LLM 호출 성공 → 1칸 소비.
+    await recordUsage(admin, user.id, "llm");
+
     // 3) 이력 적재(reports — service-role, RLS insert 정책 없음).
-    const admin = createAdminClient();
     const { error: insError } = await admin.from(REPORTS).insert({
       user_id: user.id,
       kind: "comparison",

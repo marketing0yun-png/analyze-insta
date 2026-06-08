@@ -7,6 +7,11 @@ import { MetaApiError } from "@/lib/meta/client";
 import { collectOwnedAccount, collectTrackedAccount } from "@/lib/meta/collect";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import {
+  getMeterStatus,
+  meterBlockedMessage,
+  recordUsage,
+} from "@/lib/server/usage-meter";
 
 /** 토큰 복호화(node:crypto) → Node 런타임 강제. */
 export const runtime = "nodejs";
@@ -119,6 +124,16 @@ export async function POST(req: Request) {
       );
     }
 
+    // 사용량 미터(D-024): 캐시 히트(위)는 Meta 를 안 부르므로 카운트 안 함 — 여기 도달한
+    // 실제 수집만 게이트·기록. 개인 토큰(본인 cred 있음)이면 collect 무제한이라 통과.
+    const meter = await getMeterStatus(admin, user.id, "collect");
+    if (!meter.allowed) {
+      return NextResponse.json(
+        { error: meterBlockedMessage(meter), meter },
+        { status: 429 }
+      );
+    }
+
     const token = decryptToken(cred.encrypted_token as string);
     const ref = {
       id: account.id as string,
@@ -131,6 +146,9 @@ export async function POST(req: Request) {
       account.access_tier === "delegated"
         ? await collectOwnedAccount(admin, ref, token, cred.ig_user_id as string)
         : await collectTrackedAccount(admin, ref, token, cred.ig_user_id as string);
+
+    // 실제 수집 성공 → 미터 1칸 소비(개인=무제한이라 기록만 남고 한도엔 영향 없음).
+    await recordUsage(admin, user.id, "collect");
 
     return NextResponse.json({ ok: true, result }, { status: 200 });
   } catch (err) {

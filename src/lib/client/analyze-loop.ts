@@ -60,6 +60,8 @@ export async function analyzeAccountLooped(
           id,
           reanalyze: Boolean(opts.reanalyze) && first,
           limit: ANALYZE_CHUNK,
+          // 첫 청크만 LLM 미터 소비(서버). 연속 청크는 같은 분석이라 추가 차감 없음.
+          first,
         }),
       });
       json = await res.json();
