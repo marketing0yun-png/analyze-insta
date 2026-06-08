@@ -64,3 +64,76 @@ export function getMetaAppCreds(): { appId: string; appSecret: string } | null {
 export function getMetaGraphVersion(): string {
   return process.env.META_GRAPH_VERSION || "v21.0";
 }
+
+// =====================================================================
+// AI 분석 (Phase 2) — 프로바이더 추상화. 1차 구현체: Gemini(Vertex AI).
+// 모델 교체/사용자 선택을 위해 env 로 프로바이더·모델을 결정한다(D-016).
+// =====================================================================
+
+/** 활성 AI 프로바이더. 미설정 시 gemini. (향후 'claude' 추가) */
+export function getAIProviderName(): "gemini" {
+  const p = (process.env.AI_PROVIDER || "gemini").toLowerCase();
+  if (p !== "gemini") {
+    throw new Error(
+      `[env] 지원하지 않는 AI_PROVIDER='${p}'. 현재 'gemini'만 구현됨 (D-016).`
+    );
+  }
+  return p;
+}
+
+export type VertexConfig = {
+  project: string;
+  location: string;
+  model: string;
+  /** 호출별 maxOutputTokens 미지정 시 적용할 기본 상한. (gemini-2.5-flash 최대 65536) */
+  maxOutputTokens: number;
+  /** 인라인 서비스계정(JSON). 없으면 ADC(GOOGLE_APPLICATION_CREDENTIALS 파일)로 인증. */
+  credentials: Record<string, unknown> | null;
+};
+
+/**
+ * Vertex AI(Gemini) 설정. **서버 전용.**
+ * 인증 우선순위:
+ *  1) GOOGLE_VERTEX_CREDENTIALS_JSON (인라인 JSON 문자열) — Vercel 등 파일 없는 환경용.
+ *  2) GOOGLE_APPLICATION_CREDENTIALS (키 파일 경로) — 로컬 개발용(ADC).
+ * project 는 명시값(GOOGLE_VERTEX_PROJECT) > 인라인 자격증명의 project_id 순.
+ */
+export function getVertexConfig(): VertexConfig {
+  const location = process.env.GOOGLE_VERTEX_LOCATION || "global";
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+
+  // gemini-2.5-flash 출력 토큰 최대 = 65536. 미설정/비정상값이면 최대치로.
+  const parsedMax = Number(process.env.GEMINI_MAX_OUTPUT_TOKENS);
+  const maxOutputTokens =
+    Number.isFinite(parsedMax) && parsedMax > 0 ? parsedMax : 65536;
+
+  let credentials: Record<string, unknown> | null = null;
+  const inline = process.env.GOOGLE_VERTEX_CREDENTIALS_JSON;
+  if (inline) {
+    try {
+      credentials = JSON.parse(inline) as Record<string, unknown>;
+    } catch {
+      throw new Error(
+        "[env] GOOGLE_VERTEX_CREDENTIALS_JSON 파싱 실패 — 유효한 JSON 인지 확인하세요."
+      );
+    }
+  }
+
+  const project =
+    process.env.GOOGLE_VERTEX_PROJECT ||
+    (credentials?.project_id as string | undefined);
+
+  if (!project) {
+    throw new Error(
+      "[env] Vertex project 미설정 — GOOGLE_VERTEX_PROJECT 또는 인라인 자격증명의 project_id 가 필요합니다."
+    );
+  }
+  if (!credentials && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    throw new Error(
+      "[env] Vertex 자격증명 미설정 — GOOGLE_APPLICATION_CREDENTIALS(키 파일 경로) 또는 " +
+        "GOOGLE_VERTEX_CREDENTIALS_JSON(인라인) 중 하나가 필요합니다 (docs/08_SETUP.md §5)."
+    );
+  }
+
+  return { project, location, model, maxOutputTokens, credentials };
+}
