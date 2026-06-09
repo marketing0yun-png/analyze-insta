@@ -3,9 +3,10 @@
 > 개발 재개 시 **여기 "다음 할 일"부터** 본다. 작업 완료마다 체크박스/상태 갱신.
 
 ## 현재 상태
-🟢 **배포 완료 + 익명 폐기→구글 로그인 게이트 + 데모(목업) 모드 구현 완료(로컬, build/lint 통과 2026-06-09, D-026) — 운영자 Supabase Google OAuth 설정 후 활성화.**
+🟢 **배포(Vercel `analyze-insta.vercel.app`) + 익명 폐기→구글 로그인 게이트 + 데모(목업) 모드 구현·푸시 완료(2026-06-09, D-026, 커밋 `7b17d32`). Supabase Google OAuth 설정 완료 → 실서비스 로그인 동작 검증 단계.**
 - **3단계:** 데모(비로그인, 목업만) → 체험계정(로그인+오너 토큰, 2h 한도) → 개인 토큰(무제한+노출·도달). 비로그인 홈=`DemoHome` 미리보기 + `/accounts/demo` 예시 대시보드. `ConnectCard`에 체험계정(관리자 토큰·횟수 제한) 안내.
-- **운영자 잔여:** Supabase Authentication→Providers→Google 활성화 + URL Configuration 에 `<origin>/auth/callback` 등록(`docs/12_GUIDE_GOOGLE_LOGIN.md`).
+- **운영자 설정 완료(2026-06-09):** Google Cloud OAuth 클라이언트(웹) 생성 + 리디렉션 URI = Supabase 콜백. Supabase Authentication→Providers→Google **활성화 + Client ID/Secret 저장**. URL Configuration Redirect URLs 는 와일드카드(`https://analyze-insta.vercel.app/**`, `http://localhost:3000/**`)로 `/auth/callback` 커버.
+- **남은 확인(차단 가능):** ① 구글 **대상→테스트 사용자 추가 또는 앱 게시**(안 하면 "액세스 차단됨"). ② Vercel 환경변수(`NEXT_PUBLIC_SUPABASE_URL/ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TOKEN_ENCRYPTION_KEY`, AI/오너 토큰 등) 등록 확인. ③ 실서비스에서 구글 로그인 왕복 + 토큰 연결까지 1회 검증.
 
 🟢 **Phase 3.5 + Phase 3 배포 잔여(마스터·구글로그인 스캐폴딩) 구현 완료(로컬, build/lint 통과 2026-06-09, D-025) — 사용자 검수 대기.**
 - **오너 토큰 폴백(선결 과제 해소):** `META_OWNER_TOKEN` env → `/collect`가 체험 유저 외부 수집을 오너 토큰으로 대행 → **체험 collect 한도(2h 5회) 실제 발동**. 내 계정 노출·도달은 개인 토큰 전용(체험 차단·안내).
@@ -55,9 +56,10 @@
 **외부 리소스 — 사용자/오너 작업 필요(코드만으론 불가):**
 - [x] Supabase 프로젝트(공용 `nushcvgafwqosnkzlsrm` 재사용) → URL/anon키 `.env.local` 입력 완료
 - [x] 마이그레이션 적용(공용 프로젝트에 `analyze_insta_*` 테이블 존재 확인됨)
-- [x] **Supabase 익명 로그인 토글 ON** (2026-06-07 검증 — 익명 세션 발급 성공)
+- [x] ~~Supabase 익명 로그인 토글 ON~~ → **D-026 에서 익명 폐기, 구글 로그인으로 교체.** Supabase Google provider 활성화 완료(2026-06-09).
 - [x] `SUPABASE_SERVICE_ROLE_KEY` 를 `.env.local` 에 입력 (검증 — RLS 우회 접근 성공)
-- [ ] Vercel 저장소 연결 + 환경변수 등록
+- [x] **Vercel 저장소 연결 + 배포**(`analyze-insta.vercel.app`, main 자동 배포). ⚠️ 환경변수 등록 여부는 최종 확인 필요(현재 상태 "남은 확인" 참조).
+- [x] **Google Cloud OAuth 클라이언트(웹) 생성 + Supabase Google provider 설정**(2026-06-09, D-026).
 - [ ] Meta 개발자 앱 생성 → `META_APP_ID/SECRET` ⏳ **보류**(휴대폰 인증 이슈, 재개 예정)
 
 ## Phase 1 — 외부계정 공개지표 대시보드 ⭐ MVP 핵심
@@ -112,7 +114,7 @@
       (account-metrics avgReach/avgImpressions/avgSaved/avgVideoViews, 대시보드 "내 계정 인사이트" 카드,
       비교 정량표 도달 열(내 계정만) + 프롬프트 "외부는 추정 금지".)
 - [x] 마스터 콘솔(전체 데이터 조합 뷰) — **구현 완료(D-025)** (`/master` + `GET/POST /api/master`, `isMaster` env 화이트리스트)
-- [x] **익명 폐기 → 구글 로그인 게이트 + 데모(목업) 모드** — **구현 완료(D-026)**. 비로그인=데모 목업만, 실이용=구글 로그인 후. `signInWithGoogle`/`signOut`/`/auth/callback`(PKCE 교환) + `DemoHome`/`/accounts/demo` + `ConnectCard` 체험계정 안내. **운영자 잔여:** Supabase Google OAuth 활성화 + Redirect URL `<origin>/auth/callback` 등록(`docs/12_GUIDE_GOOGLE_LOGIN.md`).
+- [x] **익명 폐기 → 구글 로그인 게이트 + 데모(목업) 모드** — **구현·배포·OAuth 설정 완료(D-026, 2026-06-09)**. 비로그인=데모 목업만, 실이용=구글 로그인 후. `signInWithGoogle`/`signOut`/`/auth/callback`(PKCE 교환) + `DemoHome`/`/accounts/demo` + `ConnectCard` 체험계정 안내. Supabase Google provider·Redirect URL 설정 완료(`docs/12_GUIDE_GOOGLE_LOGIN.md`). **잔여:** 실서비스 로그인 왕복 검증 + 구글 테스트사용자/앱게시.
 - [ ] Meta 앱 검수(일반 공개 시) / 또는 테스터 한정 운영 결정 — **외부 차단**(휴대폰 인증 보류)
 - [~] 배포 전 보안 체크(`docs/06_AUTH_SECURITY.md` §5) — 토큰암호화·시크릿분리·마스터격리 확인, 구글로그인·Meta검수만 잔여
 - **완료 기준:** MVP 배포 가능. 광고주 본인 계정은 노출까지, 경쟁사는 공개지표로 비교. → **데이터/비교 핵심 구현 완료, 사용자 검수 대기. 배포 잔여(마스터·구글로그인·검수)는 후속.**
@@ -169,21 +171,30 @@
 ---
 
 ## 다음 할 일 (Next Action)
-> Phase 1·2·2.5 + **Phase 3 핵심(내 계정 노출·도달)** 구현 완료. **사용자 검수 단계.**
-> 0. **Phase 3(내 계정) 검수(`npm run dev`):**
->    - ⚠️ **본인 비즈니스 계정 토큰(스코프에 `instagram_manage_insights` 포함)** 연결 → "내 계정 분석 추가" 버튼 → 목록에 초록 **"내 계정"** 배지.
->    - 해당 행 "수집" → 노트에 "인사이트 N개" → `/accounts/[id]` 지표 탭에 **"내 계정 인사이트(노출·도달)" 카드** + 상위 게시물에 "도달".
->    - Supabase `analyze_insta_post_metrics`에 reach/impressions 채워졌는지 확인. (외부 계정은 여전히 null)
->    - **일괄/캐시:** 전체선택 → "선택 수집 & 분석" → 행별 진행 관찰. 재실행 시 "캐시됨(오늘 이미 수집)" 스킵 → "강제 갱신" 체크 후 재실행 시 실제 재수집.
->    - **비교:** 내 계정 포함 2~5개 비교 → 정량표 "평균도달(내계정)" 열 + 평가에서 외부는 노출·도달 추정 안 함.
-> 1. **Phase 2 검수(`npm run dev`):**
->    - 토큰 연결 + 계정 수집 후 → `/accounts/[id]` → "콘텐츠 인사이트" 탭 → "AI 분석 실행".
->    - 소구점 빈도·톤/포맷·키워드·게시물별(주제·요약·소구점) 카드 확인. "전체 재분석" 동작 확인.
->    - ⚠️ Vertex 자격증명 필요(`GOOGLE_APPLICATION_CREDENTIALS` 또는 인라인 JSON). `/api/ai/ping` 으로 연결 선검증.
-> 2. **Phase 2.5 검수:** 홈 "비교 분석" → `/compare` → 참여율 리더보드 확인 → 매장 2~5개 선택 → "비교 분석" → 정량표 + 냉정 평가(강점/약점/개선책). (각 매장 콘텐츠 분석이 선행돼야 의미 있음)
-> 3. **Phase 1 검수(잔여):** 분석 대상 "분석" → 참여율·시간대(KST)·요일·포맷·상위 게시물. 해시태그 검색(쿼터 N/30, 소비 주의).
->    - ⚠️ **이미지 비전(D-022) 검수:** 비디오/릴스 썸네일 비전은 thumbnail_url 이 필요 → 기존 계정은 **"수집" 재실행 후** 재분석해야 채워짐(이미지/캐러셀은 기존 media_url 로 즉시 가능). 게시물 카드의 🖼️ 비주얼 노트와 분석 완료 메시지의 "이미지 N장 포함" 확인. 비용 줄이려면 `AI_VISION=off`.
-> 4. **검수 피드백 반영** → 분석/비교 프롬프트·스키마 조정.
-> 5. **(다음)** ~~이미지 비전~~(완료, D-022) → ~~Phase 3 내 계정 노출·도달~~(완료, D-023) → **Phase 3 배포 잔여**: 마스터 콘솔, 익명→구글 로그인(link identity), 배포 전 보안 체크.
-> 6. **(추후/비차단)** 배치 수집/분석 Edge Function 분리(D-015), Meta 앱 시크릿 입력(장기토큰 교환)·앱 검수(휴대폰 인증 보류), 인사이트 중첩 필드 최적화(D-023).
+> **배포 라이브(`analyze-insta.vercel.app`) + 구글 로그인/데모 모드 푸시 완료(D-026).** 이제 **실서비스 동작 검증**이 1순위.
+>
+> ### 0. ⭐ 실서비스 구글 로그인 E2E 검증 (지금 바로)
+>    - 배포 **Ready** 확인(Vercel Deployments, 커밋 `7b17d32`) → `analyze-insta.vercel.app` 강력 새로고침(Ctrl+Shift+R).
+>    - **로그아웃 상태:** 데모 배너 + "구글로 시작하기" + 예시 사용량·계정 + `/accounts/demo` 예시 대시보드(노출·도달 포함) 노출 확인.
+>    - **로그인:** "구글로 로그인하고 시작" → 구글 동의 → 복귀 후 상단에 **이메일 + 로그아웃**.
+>      - ⚠️ "액세스 차단됨" 이면 → 구글 **대상→테스트 사용자 추가** 또는 **앱 게시**.
+>      - ⚠️ 로그인 후 기능에서 503/오류면 → **Vercel 환경변수** 누락(현재 상태 "남은 확인" 목록 등록).
+>    - **체험계정 인지:** 토큰 미연결 상태에서 "인스타 토큰 연결" 카드에 **체험계정(관리자 토큰·횟수 제한) 안내** 노출 확인.
+>    - **로그아웃** → 다시 데모 모드 복귀 확인.
+>
+> ### 1. 기능 검수 (로그인 후, 로컬 `npm run dev` 또는 배포)
+>    - **Phase 3(내 계정):** 본인 비즈니스 토큰(`instagram_manage_insights`) 연결 → "내 계정 분석 추가" → 초록 "내 계정" 배지 → "수집" → `/accounts/[id]` "내 계정 인사이트(노출·도달)" 카드 + 상위 게시물 "도달". Supabase `analyze_insta_post_metrics` reach/impressions 확인. 일괄/캐시/강제갱신·비교 도달열.
+>    - **Phase 2:** `/accounts/[id]` "콘텐츠 인사이트" → "AI 분석 실행" → 소구점/톤/키워드·게시물별. (Vertex 자격증명 필요 — `/api/ai/ping` 선검증.) 이미지 비전(D-022): 비디오/릴스는 **재수집** 후 재분석해야 thumbnail 채워짐.
+>    - **Phase 2.5:** 홈 "비교 분석" → `/compare` → 리더보드 → 2~5개 → 냉정 평가.
+>    - **Phase 1:** 참여율·시간대(KST)·요일·포맷·상위 게시물 / 해시태그(쿼터 소비 주의).
+>    - **체험 한도:** 오너 토큰(`META_OWNER_TOKEN`)으로 체험 수집 2h 5회 발동 확인 / 미터 카드 카운트다운.
+>
+> ### 2. 검수 피드백 반영 → 분석/비교 프롬프트·스키마 조정.
+>
+> ### 3. (추후/비차단)
+>    - 배치 수집/분석 Edge Function 분리(D-015).
+>    - Meta 앱 시크릿(`META_APP_ID/SECRET`) 입력·앱 검수(휴대폰 인증 보류) → 페이스북 OAuth 개인 토큰 자동 발급.
+>    - (정식) Claude provider 추가/모델 선택, 크레딧 충전(Phase 3.5).
+>    - 배포 전 보안 체크 마무리(`docs/06_AUTH_SECURITY.md §5`).
+>    - ── **MVP 점검** 후 Phase 4(서드파티) 진행 여부 결정.
 > - 로컬 실행: `npm install` → `npm run dev` → http://localhost:3000

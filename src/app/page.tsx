@@ -1,5 +1,7 @@
-import { Activity, TrendingUp } from "lucide-react";
+import Link from "next/link";
+import { Activity } from "lucide-react";
 
+import { Logo } from "@/components/brand/logo";
 import { HomeSection } from "@/components/home/home-section";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -61,7 +63,7 @@ export default function Home() {
       <header className="mb-8">
         <div className="mb-3 flex items-center gap-2">
           <span className="bg-primary text-primary-foreground inline-flex size-9 items-center justify-center rounded-lg">
-            <TrendingUp className="size-5" />
+            <Logo className="size-5" />
           </span>
           <Badge variant="outline" className="gap-1">
             <Activity className="size-3" /> Phase 3
@@ -105,8 +107,16 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="text-muted-foreground mt-10 text-xs">
-        외부 계정은 공개지표만(노출·도달 ❌). 토큰은 서버사이드 전용·암호화.
+      <footer className="text-muted-foreground mt-10 space-y-2 text-xs">
+        <p>외부 계정은 공개지표만(노출·도달 ❌). 토큰은 서버사이드 전용·암호화.</p>
+        <p className="flex items-center gap-3">
+          <Link href="/privacy" className="hover:text-foreground underline">
+            개인정보처리방침
+          </Link>
+          <Link href="/terms" className="hover:text-foreground underline">
+            이용약관
+          </Link>
+        </p>
       </footer>
     </main>
   );
