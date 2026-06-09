@@ -129,6 +129,9 @@ export function UsageMeterCard() {
   if (authStatus !== "ready" || !usage) return null;
 
   const isTrial = usage.tier === "trial";
+  // 분석·비교 잔여가 적을 때(≤1) "비교용 1회 남기기" 안내(공용 풀, D-024).
+  const llmLow =
+    usage.llm.limit !== null && (usage.llm.remaining ?? 0) <= 1;
 
   return (
     <Card>
@@ -158,12 +161,25 @@ export function UsageMeterCard() {
           meter={usage.llm}
           now={now}
         />
-        {isTrial ? (
-          <p className="text-muted-foreground pt-2 text-xs">
-            개인 토큰을 연결하면 수집·지표가 무제한이 돼요. (분석·비교는 비용
-            때문에 동일 한도 유지)
+        <div className="text-muted-foreground space-y-1 pt-2 text-xs">
+          {isTrial ? (
+            <p>
+              개인 토큰을 연결하면 수집·지표가 무제한이 돼요. (분석·비교는 비용
+              때문에 동일 한도 유지)
+            </p>
+          ) : null}
+          {llmLow ? (
+            <p className="text-amber-600 dark:text-amber-500">
+              분석·비교가 {usage.llm.remaining}회 남았어요. 일괄 분석 시 매장
+              비교분석용으로 1회는 남겨두는 걸 권장해요(같은 풀을 공유).
+            </p>
+          ) : null}
+          <p>
+            분석·비교는 AI 실비용이라 베타 동안 무료로 운영돼요(관리자 부담). 더
+            나은 모델·완화는 추후 적용 예정. 혼잡하면 수집이 잠시 느려질 수 있어요
+            {isTrial ? " — 개인 토큰을 연결하면 더 빠르고 안정적이에요." : "."}
           </p>
-        ) : null}
+        </div>
       </CardContent>
     </Card>
   );

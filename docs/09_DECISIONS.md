@@ -178,6 +178,17 @@
 - **구현 범위:** 사용 이력 테이블 + 해시태그 신청 테이블(마이그레이션) + 다수 라우트 게이트 + UI(카운트다운·안내·비활성). 특정 기능이 아닌 **전 기능 위에 얹히는 층**이라 별도 Phase(3.5)로 분리.
 - **날짜:** 2026-06-09
 
+## D-025. Phase 3.5 잔여 게이트 완성 + 마스터 콘솔 + 오너 토큰 폴백
+- **결정:** D-024의 선결 과제와 잔여 게이트를 모두 구현하고, Phase 3의 마스터 콘솔을 추가한다. 외부 의존(구글 로그인·Meta 검수·Vercel)은 **코드 스캐폴딩 + 가이드**까지만(활성화는 운영자 작업).
+- **오너 토큰 폴백(선결 과제 해소):** 오너(운영자) 본인 토큰을 env(`META_OWNER_TOKEN`, 선택 `META_OWNER_IG_USER_ID`)로 주입(`getOwnerMetaToken`). `/collect`가 **본인 credential 우선, 없으면(체험) 오너 토큰으로 외부 공개지표 수집을 대행**한다. 이로써 체험 티어가 실제 collect 경로를 타고 **2시간 5회 한도가 발동**한다(개인=무제한). ⚠️ **내 계정(delegated) 노출·도달은 오너 토큰으로 물리적 불가**(남의 인사이트 조회 금지, D-023) → 체험은 명시적으로 차단하고 개인 토큰 연결을 안내. 오너 토큰 미설정 시 체험 수집은 비활성(개인 토큰 유도). `igUserId` 미지정이면 런타임 `resolveInstagramUser`로 1회 해석.
+- **외부 계정 개수 한도:** `ACCOUNT_LIMITS`(체험 3 / 개인 10). `/api/accounts` POST가 `getExternalAccountUsage`(service-role 카운트, `account_kind != 'owned'`)로 사전 차단(409). service-role 미설정 등 예외는 경고만 남기고 통과(개발 편의).
+- **해시태그 티어 분기:** `/hashtags` POST가 개인 토큰 없으면 직접 검색 대신 `analyze_insta_hashtag_requests`에 **신청**(202)을 적재. GET은 티어별로 `quota/jobs`(개인) + **공통 큐레이션**(`analyze_insta_curated_hashtags`, 모든 티어) + 본인 신청 이력을 반환. 마이그레이션 `20260610000001_hashtag_requests.sql`(공용 프로젝트 적용 완료). 큐레이션 RLS = 인증 사용자 전체 SELECT, 쓰기는 service-role(마스터)만.
+- **마스터 콘솔:** 식별 = env 화이트리스트(`MASTER_EMAILS` 1순위 / `MASTER_USER_IDS` 익명단계 임시), `lib/server/master.ts`의 `isMaster`. `GET /api/master`(사용자 수·개인토큰 수·사용량 2h/24h·계정 종류별·신청 대기·큐레이션) + `POST`(add_curated / fulfill_request[+큐레이션] / reject_request) 모두 service-role. `/master` 페이지는 권한 없으면 403 메시지. 둘 다 비어 있으면 누구도 마스터 아님(안전 기본값).
+- **안내 UI:** `UsageMeterCard`에 LLM 비용(베타 무료·관리자 부담)·혼잡(수집 지연→개인 토큰 유도)·**"비교용 1회 남기기"**(분석·비교 공용 풀, 잔여 ≤1 시) 문구. 해시태그 카드 체험 모드(신청 버튼·큐레이션·신청 이력). 내 계정 체험 수집 차단 메시지.
+- **구글 로그인 스캐폴딩:** `AuthProvider`에 `linkGoogle`(`linkIdentity({provider:'google'})`)·`isAnonymous` 노출 + 익명 세션 한정 `GoogleLinkCard`. **활성화는 Supabase 대시보드 Google OAuth 설정 필요**(docs/12_GUIDE_GOOGLE_LOGIN.md). 미설정 시 버튼이 에러를 그대로 표시.
+- **범위 밖(후속):** Claude provider 정식 추가(새 의존성·API 키 — 정식 단계), Meta 앱 검수(휴대폰 인증 보류), Vercel 연결, 크레딧 충전.
+- **날짜:** 2026-06-09
+
 ---
 ## 미해결/추후 결정
 - [ ] 로그인 프로바이더 최종 확정(구글 단독 vs 구글+카카오) — 현재 구글 우선 가정.

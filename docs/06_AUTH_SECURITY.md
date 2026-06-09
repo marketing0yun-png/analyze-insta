@@ -49,7 +49,10 @@
 - 마스터 전체 접근은 RLS 우회(service-role)로만, 서버에서.
 
 ## 5. 배포 전 체크
-- [ ] 익명 → 구글 link identity 동작 확인(데이터 보존)
-- [ ] 토큰 암호화 저장·복호화 서버 경유 확인
-- [ ] service-role/앱 시크릿이 프론트 번들에 없음 확인
-- [ ] Meta 앱 검수(일반 공개 시) 또는 테스터 한정 운영 결정
+- [ ] 익명 → 구글 link identity 동작 확인(데이터 보존) — **코드 스캐폴딩 완료(D-025)**, Supabase Google OAuth 설정 필요(`docs/12_GUIDE_GOOGLE_LOGIN.md`)
+- [x] 토큰 암호화 저장·복호화 서버 경유 확인 (`lib/crypto/token.ts`, 토큰 라우트 `runtime='nodejs'`·복호화 service-role 경유)
+- [x] service-role/앱 시크릿이 프론트 번들에 없음 확인 (`lib/env.ts`: `NEXT_PUBLIC_*`만 공개, 서버 getter는 `server-only`에서만)
+- [x] 마스터 전체 접근은 service-role + env 화이트리스트(`isMaster`)로만 (`/api/master`, D-025)
+- [ ] Meta 앱 검수(일반 공개 시) 또는 테스터 한정 운영 결정 — **휴대폰 인증 보류로 외부 차단**
+- [ ] `META_OWNER_TOKEN`(체험 수집용)은 서버 env에만, 장기 토큰 권장(만료 시 체험 수집 중단)
+- [ ] 배포 시 env 등록: `MASTER_EMAILS`·`META_OWNER_TOKEN` + 기존 시크릿 일체 (Vercel/Supabase 시크릿)

@@ -163,6 +163,11 @@ export function CompareView() {
     }
   }
 
+  // 선택했지만 아직 AI 분석 전인 매장(콘텐츠 평가가 비게 됨) — 비교 전 경고.
+  const selectedUnanalyzed = items.filter(
+    (it) => selected.includes(it.id) && it.analyzedPosts === 0
+  );
+
   const backLink = (
     <Link
       href="/"
@@ -184,6 +189,12 @@ export function CompareView() {
           참여율 순으로 정렬됩니다. 비교할 매장을 2~5개 선택하면 LLM이 냉정하게
           평가합니다. (외부는 공개지표, 내 계정은 노출·도달까지 포함)
         </p>
+        <div className="mt-2 rounded-md border border-amber-300/60 bg-amber-50/60 p-2.5 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
+          <strong>순서:</strong> 각 매장을 <strong>수집 → AI 분석</strong>까지
+          끝낸 뒤 비교하세요. 분석이 안 된 매장은 콘텐츠 평가(소구점·톤·아이디어)가
+          비어 표시됩니다. (분석은 홈의 “선택 수집 &amp; 분석” 또는 각 계정의
+          “콘텐츠 인사이트 → AI 분석”)
+        </div>
       </header>
 
       {authStatus !== "ready" || loading ? (
@@ -246,6 +257,11 @@ export function CompareView() {
                         </div>
                         <div className="text-muted-foreground mt-0.5 text-xs">
                           팔로워 {fmt(it.followers)} · 분석 {it.analyzedPosts}개
+                          {it.analyzedPosts === 0 && (
+                            <span className="ml-1 text-amber-600 dark:text-amber-500">
+                              · ⚠ AI 분석 필요
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
@@ -322,6 +338,18 @@ export function CompareView() {
               </Button>
             )}
           </div>
+
+          {selectedUnanalyzed.length > 0 && (
+            <div className="rounded-md border border-amber-300/60 bg-amber-50/60 p-2.5 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
+              선택한 매장 중{" "}
+              <strong>
+                {selectedUnanalyzed.map((it) => `@${it.username}`).join(", ")}
+              </strong>
+              은(는) 아직 AI 분석 전이라 콘텐츠 평가가 비어 나옵니다. 더 정확한
+              비교를 원하면 먼저 분석을 실행하세요. (선택 매장 전부가 미분석이면
+              비교가 막힙니다)
+            </div>
+          )}
 
           {error && (
             <div className="text-destructive border-destructive/30 rounded-md border p-3 text-sm">

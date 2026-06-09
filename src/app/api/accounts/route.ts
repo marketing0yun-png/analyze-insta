@@ -2,7 +2,9 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { ACCOUNT_LIMITS, getExternalAccountUsage } from "@/lib/server/usage-meter";
 
 /** RLS(사용자 컨텍스트) 사용 — 본인 소유 행만 접근. Node 런타임 필요 없음이나 통일. */
 export const runtime = "nodejs";
@@ -113,6 +115,34 @@ export async function POST(req: Request) {
     typeof body?.account_kind === "string" && ACCOUNT_KINDS.has(body.account_kind)
       ? body.account_kind
       : "competitor";
+
+  // 외부 계정 개수 한도(D-024): 체험 3 / 개인 10. 내 계정(owned)은 self 라우트 전용이라 제외.
+  // 티어·카운트는 service-role 로 확인(api_credentials 는 RLS 정책 없음).
+  if (accountKind !== "owned") {
+    try {
+      const admin = createAdminClient();
+      const usage = await getExternalAccountUsage(admin, user.id);
+      if (!usage.allowed) {
+        const tierLabel = usage.tier === "trial" ? "체험" : "개인 토큰";
+        const hint =
+          usage.tier === "trial"
+            ? " 개인 토큰을 연결하면 최대 10개까지 등록할 수 있어요."
+            : "";
+        return NextResponse.json(
+          {
+            error:
+              `외부 계정은 ${tierLabel} 기준 ${ACCOUNT_LIMITS[usage.tier]}개까지 등록할 수 있어요 ` +
+              `(현재 ${usage.count}개).${hint} 불필요한 계정을 지우고 다시 시도하세요.`,
+          },
+          { status: 409 }
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      // service-role 미설정 등은 등록 자체를 막지 않도록 경고만 남기고 통과(개발 편의).
+      console.warn("[api/accounts] 개수 한도 확인 건너뜀:", message);
+    }
+  }
 
   // 카테고리 find-or-create (선택).
   let categoryId: string | null = null;

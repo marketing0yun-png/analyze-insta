@@ -54,6 +54,27 @@ type RunResult = {
   reusedQuota: boolean;
 };
 
+type Curated = { id: string; hashtag: string; note: string | null };
+type Request = {
+  id: string;
+  keyword: string;
+  status: string;
+  requested_at: string;
+};
+type HashtagState = {
+  tier: "trial" | "personal" | null;
+  quota: Quota | null;
+  jobs: Job[];
+  curated: Curated[];
+  requests: Request[];
+};
+
+const REQ_STATUS_LABEL: Record<string, string> = {
+  requested: "검토 중",
+  fulfilled: "처리됨",
+  rejected: "반려",
+};
+
 function fmt(n: number | null | undefined): string {
   if (n == null) return "—";
   return n.toLocaleString("ko-KR");
@@ -62,16 +83,25 @@ function fmt(n: number | null | undefined): string {
 export function HashtagCard() {
   const { status: authStatus } = useAuth();
   const [keyword, setKeyword] = React.useState("");
-  const [quota, setQuota] = React.useState<Quota | null>(null);
-  const [jobs, setJobs] = React.useState<Job[]>([]);
+  const [state, setState] = React.useState<HashtagState>({
+    tier: null,
+    quota: null,
+    jobs: [],
+    curated: [],
+    requests: [],
+  });
   const [loading, setLoading] = React.useState(true);
   const [searching, setSearching] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [info, setInfo] = React.useState<string | null>(null);
   const [results, setResults] = React.useState<RunResult | null>(null);
+
+  const { tier, quota, jobs, curated, requests } = state;
+  const isPersonal = tier === "personal";
 
   const fetchState = React.useCallback(async () => {
     const res = await fetch("/api/hashtags", { cache: "no-store" });
-    return (await res.json()) as { quota: Quota | null; jobs: Job[] };
+    return (await res.json()) as HashtagState;
   }, []);
 
   React.useEffect(() => {
@@ -80,10 +110,7 @@ export function HashtagCard() {
     (async () => {
       try {
         const data = await fetchState();
-        if (active) {
-          setQuota(data.quota);
-          setJobs(data.jobs ?? []);
-        }
+        if (active) setState(data);
       } finally {
         if (active) setLoading(false);
       }
@@ -96,6 +123,7 @@ export function HashtagCard() {
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     setResults(null);
     setSearching(true);
     try {
@@ -107,14 +135,16 @@ export function HashtagCard() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "검색 실패");
+      } else if (data.requested) {
+        // 체험: 신청 접수됨.
+        setInfo(data.message ?? "신청을 접수했어요.");
+        setKeyword("");
+        setState(await fetchState());
       } else {
         const r = data.result as RunResult;
         setResults(r);
-        setQuota(r.quota);
         setKeyword("");
-        // 이력 갱신
-        const refreshed = await fetchState();
-        setJobs(refreshed.jobs ?? []);
+        setState(await fetchState());
       }
     } catch {
       setError("요청 중 오류가 발생했습니다.");
@@ -130,9 +160,9 @@ export function HashtagCard() {
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
-            <Hash className="size-4" /> 해시태그 검색
+            <Hash className="size-4" /> 해시태그 {isPersonal ? "검색" : "신청"}
           </CardTitle>
-          {quota && (
+          {isPersonal && quota && (
             <Badge
               variant={lowQuota ? "destructive" : "secondary"}
               className={lowQuota ? "" : "font-mono"}
@@ -142,8 +172,19 @@ export function HashtagCard() {
           )}
         </div>
         <CardDescription>
-          인기 게시물을 조회합니다. <strong>토큰당 7일에 30개 고유 태그</strong>{" "}
-          하드 쿼터가 있어 신중히 사용하세요. (작성자·조회수는 제공 안 됨)
+          {isPersonal ? (
+            <>
+              인기 게시물을 조회합니다.{" "}
+              <strong>토큰당 7일에 30개 고유 태그</strong> 하드 쿼터가 있어 신중히
+              사용하세요. (작성자·조회수는 제공 안 됨)
+            </>
+          ) : (
+            <>
+              직접 검색은 <strong>개인 토큰</strong>이 필요해요(7일 30개 쿼터).
+              체험 단계에선 키워드를 <strong>신청</strong>하면 운영자가 검색해 아래
+              공통 목록에 올려 드립니다.
+            </>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
@@ -167,17 +208,17 @@ export function HashtagCard() {
               <Button type="submit" disabled={searching || !keyword.trim()}>
                 {searching ? (
                   <>
-                    <Loader2 className="animate-spin" /> 검색 중…
+                    <Loader2 className="animate-spin" /> {isPersonal ? "검색 중…" : "신청 중…"}
                   </>
                 ) : (
                   <>
-                    <Search /> 검색
+                    <Search /> {isPersonal ? "검색" : "신청"}
                   </>
                 )}
               </Button>
             </form>
 
-            {quota && (
+            {isPersonal && quota && (
               <p className="text-muted-foreground text-xs">
                 이번 7일 잔여 {quota.remaining}개.{" "}
                 {quota.recentHashtags.length > 0 && (
@@ -186,9 +227,45 @@ export function HashtagCard() {
               </p>
             )}
 
+            {info && (
+              <div className="rounded-md border border-emerald-600/30 bg-emerald-50 p-3 text-xs text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+                {info}
+              </div>
+            )}
+
             {error && (
               <div className="text-destructive border-destructive/30 rounded-md border p-3">
                 {error}
+              </div>
+            )}
+
+            {/* 큐레이션(공통 노출) + 내 신청 이력 */}
+            {curated.length > 0 && (
+              <div className="border-t pt-3">
+                <p className="text-muted-foreground mb-2 text-xs">추천 해시태그(공통)</p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {curated.map((c) => (
+                    <Badge key={c.id} variant="secondary" className="font-normal">
+                      #{c.hashtag}
+                    </Badge>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {!isPersonal && requests.length > 0 && (
+              <div className="border-t pt-3">
+                <p className="text-muted-foreground mb-2 text-xs">내 신청</p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {requests.map((r) => (
+                    <Badge key={r.id} variant="outline" className="font-normal">
+                      #{r.keyword}
+                      <span className="text-muted-foreground ml-1">
+                        {REQ_STATUS_LABEL[r.status] ?? r.status}
+                      </span>
+                    </Badge>
+                  ))}
+                </ul>
               </div>
             )}
 

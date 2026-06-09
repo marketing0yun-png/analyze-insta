@@ -1,6 +1,7 @@
 import { Activity, TrendingUp } from "lucide-react";
 
 import { AccountsCard } from "@/components/accounts/accounts-card";
+import { GoogleLinkCard } from "@/components/auth/google-link";
 import { ConnectCard } from "@/components/credentials/connect-card";
 import { HashtagCard } from "@/components/hashtags/hashtag-card";
 import { SetupStatus } from "@/components/setup-status";
@@ -83,6 +84,7 @@ export default function Home() {
       <section className="mb-8 space-y-3">
         <SetupStatus />
         <ConnectCard />
+        <GoogleLinkCard />
         <UsageMeterCard />
         <AccountsCard />
         <HashtagCard />

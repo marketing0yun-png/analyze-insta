@@ -2,8 +2,9 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
+import { getOwnerMetaToken } from "@/lib/env";
 import { decryptToken } from "@/lib/crypto/token";
-import { MetaApiError } from "@/lib/meta/client";
+import { MetaApiError, resolveInstagramUser } from "@/lib/meta/client";
 import { collectOwnedAccount, collectTrackedAccount } from "@/lib/meta/collect";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -106,7 +107,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    // 2) 사용자 토큰 복호화(service-role — api_credentials 는 RLS 정책 없음).
+    // 2) 토큰 해석 — 개인(본인 cred) 우선, 없으면 오너 토큰 폴백(체험·외부 한정, D-024/D-025).
     const admin = createAdminClient();
     const { data: cred, error: credError } = await admin
       .from(CREDENTIALS)
@@ -117,16 +118,47 @@ export async function POST(req: Request) {
       .limit(1)
       .maybeSingle();
     if (credError) throw credError;
-    if (!cred?.ig_user_id) {
-      return NextResponse.json(
-        { error: "먼저 인스타 토큰을 연결하세요." },
-        { status: 400 }
-      );
+
+    const isDelegated = account.access_tier === "delegated";
+    let token: string;
+    let igUserId: string;
+    let tier: "trial" | "personal";
+
+    if (cred?.ig_user_id) {
+      // 개인 토큰 등록됨 → 본인 토큰으로 수집(내 계정 인사이트까지 가능).
+      token = decryptToken(cred.encrypted_token as string);
+      igUserId = cred.ig_user_id as string;
+      tier = "personal";
+    } else {
+      // 개인 토큰 없음(체험). 내 계정 노출·도달은 본인 토큰이 반드시 필요 → 차단.
+      if (isDelegated) {
+        return NextResponse.json(
+          {
+            error:
+              "내 계정 노출·도달 분석은 개인 토큰 연결이 필요합니다. 위 '인스타 토큰 연결'에서 본인 비즈니스 계정 토큰을 입력하세요.",
+          },
+          { status: 400 }
+        );
+      }
+      // 외부 공개지표 → 오너 토큰으로 대행(체험). 오너 토큰 미설정이면 비활성.
+      const owner = getOwnerMetaToken();
+      if (!owner) {
+        return NextResponse.json(
+          {
+            error:
+              "체험 수집이 현재 비활성화되어 있습니다. 개인 토큰을 연결하면 바로 수집할 수 있어요.",
+          },
+          { status: 400 }
+        );
+      }
+      token = owner.token;
+      igUserId = owner.igUserId ?? (await resolveInstagramUser(owner.token)).igUserId;
+      tier = "trial";
     }
 
     // 사용량 미터(D-024): 캐시 히트(위)는 Meta 를 안 부르므로 카운트 안 함 — 여기 도달한
-    // 실제 수집만 게이트·기록. 개인 토큰(본인 cred 있음)이면 collect 무제한이라 통과.
-    const meter = await getMeterStatus(admin, user.id, "collect");
+    // 실제 수집만 게이트·기록. 개인 토큰이면 collect 무제한이라 통과, 체험이면 2시간 5회.
+    const meter = await getMeterStatus(admin, user.id, "collect", tier);
     if (!meter.allowed) {
       return NextResponse.json(
         { error: meterBlockedMessage(meter), meter },
@@ -134,18 +166,17 @@ export async function POST(req: Request) {
       );
     }
 
-    const token = decryptToken(cred.encrypted_token as string);
     const ref = {
       id: account.id as string,
       username: account.username as string,
     };
 
-    // 3) 수집 + 적재. 내 계정(delegated)은 인사이트(노출·도달)까지, 외부는 공개지표만.
-    //    내 계정은 반드시 토큰 주인 본인(cred.ig_user_id)을 조회한다(D-023).
+    // 3) 수집 + 적재. 내 계정(delegated·개인 토큰)은 인사이트(노출·도달)까지,
+    //    외부는 공개지표만(개인=본인 토큰 / 체험=오너 토큰 대행).
     const result =
-      account.access_tier === "delegated"
-        ? await collectOwnedAccount(admin, ref, token, cred.ig_user_id as string)
-        : await collectTrackedAccount(admin, ref, token, cred.ig_user_id as string);
+      isDelegated
+        ? await collectOwnedAccount(admin, ref, token, igUserId)
+        : await collectTrackedAccount(admin, ref, token, igUserId);
 
     // 실제 수집 성공 → 미터 1칸 소비(개인=무제한이라 기록만 남고 한도엔 영향 없음).
     await recordUsage(admin, user.id, "collect");

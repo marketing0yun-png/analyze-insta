@@ -34,8 +34,20 @@ export const USAGE_LIMITS: Record<UsageAction, Record<UsageTier, number | null>>
   llm: { trial: 5, personal: 5 },
 };
 
+/**
+ * 외부 계정(경쟁사·인플루언서) 등록 개수 한도 (D-024).
+ *  - 체험(오너 토큰): 3개 — 오너 쿼터 보호.
+ *  - 개인 토큰: 10개 — 본인 쿼터를 쓰므로 여유.
+ * 내 계정(owned)은 이 한도와 무관(토큰당 1개, 본인 토큰 전용).
+ */
+export const ACCOUNT_LIMITS: Record<UsageTier, number> = {
+  trial: 3,
+  personal: 10,
+};
+
 const USAGE = "analyze_insta_usage_events";
 const CREDENTIALS = "analyze_insta_api_credentials";
+const ACCOUNTS = "analyze_insta_tracked_accounts";
 const CHANNEL = "instagram";
 
 /**
@@ -166,6 +178,27 @@ export function meterBlockedMessage(status: MeterStatus): string {
       ? " 개인 토큰을 연결하면 수집 제한이 없어집니다."
       : "";
   return base + tail + hint;
+}
+
+/**
+ * 외부 계정(account_kind != 'owned') 등록 수 + 티어 한도. (D-024)
+ * accounts POST 게이트가 새 외부 계정 추가 전에 호출한다.
+ */
+export async function getExternalAccountUsage(
+  admin: SupabaseClient,
+  userId: string,
+  tier?: UsageTier
+): Promise<{ tier: UsageTier; count: number; limit: number; allowed: boolean }> {
+  const resolvedTier = tier ?? (await resolveTier(admin, userId));
+  const limit = ACCOUNT_LIMITS[resolvedTier];
+  const { count, error } = await admin
+    .from(ACCOUNTS)
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .neq("account_kind", "owned");
+  if (error) throw error;
+  const used = count ?? 0;
+  return { tier: resolvedTier, count: used, limit, allowed: used < limit };
 }
 
 /** 두 미터 + 티어를 한 번에 — 카운트다운 UI / 상태 엔드포인트용. */

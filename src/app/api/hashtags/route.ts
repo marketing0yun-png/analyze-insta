@@ -7,16 +7,22 @@ import { MetaApiError } from "@/lib/meta/client";
 import { getHashtagQuota, runHashtagSearch } from "@/lib/meta/hashtag";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { resolveTier } from "@/lib/server/usage-meter";
 
 export const runtime = "nodejs";
 
 const JOBS = "analyze_insta_hashtag_jobs";
 const RESULTS = "analyze_insta_hashtag_results";
 const CREDENTIALS = "analyze_insta_api_credentials";
+const REQUESTS = "analyze_insta_hashtag_requests";
+const CURATED = "analyze_insta_curated_hashtags";
 const CHANNEL = "instagram";
 
 /**
- * GET — 최근 7일 쿼터 상태 + 최근 조회 이력(결과 수 포함).
+ * GET — 티어별 해시태그 상태.
+ *  - 공통: 마스터 큐레이션 해시태그(curated) + 본인 신청 이력(requests).
+ *  - 개인 토큰: 7일 쿼터 + 본인 직접 조회 이력(jobs).
+ *  - 체험: 직접 검색 불가 → quota=null, jobs=[]. 신청 + 큐레이션만.
  */
 export async function GET() {
   const supabase = await createClient();
@@ -25,14 +31,46 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json(
-      { quota: null, jobs: [], reason: "unauthenticated" },
+      { tier: null, quota: null, jobs: [], curated: [], requests: [], reason: "unauthenticated" },
       { status: 200 }
     );
   }
 
   try {
-    const quota = await getHashtagQuota(supabase, user.id);
+    let tier: "trial" | "personal" = "trial";
+    try {
+      tier = await resolveTier(createAdminClient(), user.id);
+    } catch {
+      // service-role 미설정 등 — 기본 trial 로 동작(직접 검색 비활성).
+    }
 
+    // 큐레이션(공통 노출) — 모든 티어.
+    const { data: curatedRows } = await supabase
+      .from(CURATED)
+      .select("id, hashtag, note, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    // 본인 신청 이력.
+    const { data: reqRows } = await supabase
+      .from(REQUESTS)
+      .select("id, keyword, status, note, requested_at")
+      .eq("user_id", user.id)
+      .order("requested_at", { ascending: false })
+      .limit(20);
+
+    const curated = curatedRows ?? [];
+    const requests = reqRows ?? [];
+
+    // 개인 토큰만 직접 검색 쿼터·이력.
+    if (tier !== "personal") {
+      return NextResponse.json(
+        { tier, quota: null, jobs: [], curated, requests },
+        { status: 200 }
+      );
+    }
+
+    const quota = await getHashtagQuota(supabase, user.id);
     const { data: jobs, error } = await supabase
       .from(JOBS)
       .select(
@@ -54,7 +92,10 @@ export async function GET() {
         (j.results as Array<{ count: number }> | null)?.[0]?.count ?? 0,
     }));
 
-    return NextResponse.json({ quota, jobs: mapped }, { status: 200 });
+    return NextResponse.json(
+      { tier, quota, jobs: mapped, curated, requests },
+      { status: 200 }
+    );
   } catch (err) {
     console.error("[api/hashtags] GET 오류:", err);
     return NextResponse.json({ error: "조회 실패." }, { status: 500 });
@@ -97,10 +138,23 @@ export async function POST(req: Request) {
       .limit(1)
       .maybeSingle();
     if (credError) throw credError;
+
+    // 체험(개인 토큰 없음) — 직접 검색 불가(쿼터는 개인 토큰 소유자 부담). 신청만 받는다.
     if (!cred?.ig_user_id) {
+      const normalized = keyword.replace(/^#/, "").toLowerCase();
+      const { error: reqErr } = await admin
+        .from(REQUESTS)
+        .insert({ user_id: user.id, keyword: normalized });
+      if (reqErr) throw reqErr;
       return NextResponse.json(
-        { error: "먼저 인스타 토큰을 연결하세요." },
-        { status: 400 }
+        {
+          ok: true,
+          requested: true,
+          keyword: normalized,
+          message:
+            "해시태그 검색은 개인 토큰이 필요해요. 신청을 접수했어요 — 운영자가 검색해 공통 목록에 올리면 보여집니다.",
+        },
+        { status: 202 }
       );
     }
 

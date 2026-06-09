@@ -12,12 +12,21 @@ type AuthContextValue = {
   status: AuthStatus;
   user: User | null;
   error: string | null;
+  /** 현재 세션이 익명인지. 구글 로그인 연결 버튼 노출 판단용. */
+  isAnonymous: boolean;
+  /**
+   * 익명 세션에 구글 신원 연결(link identity) — 데이터 보존(Phase 3, D-025).
+   * Supabase 대시보드에서 Google OAuth 가 활성화돼 있어야 동작한다(미설정 시 에러 반환).
+   */
+  linkGoogle: () => Promise<{ error: string | null }>;
 };
 
 const AuthContext = React.createContext<AuthContextValue>({
   status: "loading",
   user: null,
   error: null,
+  isAnonymous: false,
+  linkGoogle: async () => ({ error: "인증이 초기화되지 않았습니다." }),
 });
 
 export function useAuth() {
@@ -30,12 +39,38 @@ export function useAuth() {
  * - 세션이 없으면 signInAnonymously()로 백그라운드 식별 → RLS 데이터 격리.
  * - 배포 전 구글 로그인으로 link identity (Phase 3).
  */
+type CoreState = Pick<AuthContextValue, "status" | "user" | "error">;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = React.useState<AuthContextValue>(() =>
+  const [state, setState] = React.useState<CoreState>(() =>
     publicEnv.supabaseUrl && publicEnv.supabaseAnonKey
       ? { status: "loading", user: null, error: null }
       : { status: "unconfigured", user: null, error: null }
   );
+
+  /** 익명 → 구글 신원 연결(link identity). 데이터 보존(D-025). */
+  const linkGoogle = React.useCallback(async (): Promise<{
+    error: string | null;
+  }> => {
+    if (!publicEnv.supabaseUrl || !publicEnv.supabaseAnonKey) {
+      return { error: "Supabase 환경변수가 설정되지 않았습니다." };
+    }
+    try {
+      const supabase = createClient();
+      const redirectTo =
+        typeof window !== "undefined" ? window.location.origin : undefined;
+      const { error } = await supabase.auth.linkIdentity({
+        provider: "google",
+        options: redirectTo ? { redirectTo } : undefined,
+      });
+      if (error) return { error: error.message };
+      return { error: null };
+    } catch (err) {
+      return {
+        error: err instanceof Error ? err.message : "구글 연결에 실패했습니다.",
+      };
+    }
+  }, []);
 
   React.useEffect(() => {
     if (!publicEnv.supabaseUrl || !publicEnv.supabaseAnonKey) return;
@@ -85,5 +120,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>;
+  const value = React.useMemo<AuthContextValue>(
+    () => ({
+      ...state,
+      isAnonymous: state.user?.is_anonymous === true,
+      linkGoogle,
+    }),
+    [state, linkGoogle]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

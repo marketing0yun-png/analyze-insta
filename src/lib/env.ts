@@ -66,6 +66,53 @@ export function getMetaGraphVersion(): string {
 }
 
 // =====================================================================
+// 오너 토큰 폴백 (Phase 3.5 · D-024/D-025) — **서버 전용.**
+// 체험 유저(개인 토큰 미등록)가 외부 계정 공개지표를 수집할 때 쓰는 "출입증".
+// 오너(운영자) 본인 토큰을 env 로 주입해, trial 티어 수집을 이 토큰으로 대행한다.
+// 이 토큰으로는 **외부 공개지표(Business Discovery)만** 가능 — 남의 노출·도달은 불가.
+// =====================================================================
+export type OwnerMetaToken = {
+  token: string;
+  /** 오너 IG 비즈니스 계정 id. 미설정이면 호출부가 resolveInstagramUser 로 1회 해석. */
+  igUserId: string | null;
+};
+
+/**
+ * 오너 Meta 토큰. 미설정이면 null → 체험 수집 비활성(개인 토큰 유도 안내).
+ *  - META_OWNER_TOKEN: 오너 본인 장기 토큰(외부 공개지표 조회용).
+ *  - META_OWNER_IG_USER_ID(선택): 오너 ig_user_id. 없으면 런타임에 1회 해석.
+ */
+export function getOwnerMetaToken(): OwnerMetaToken | null {
+  const token = process.env.META_OWNER_TOKEN;
+  if (!token) return null;
+  return { token, igUserId: process.env.META_OWNER_IG_USER_ID || null };
+}
+
+// =====================================================================
+// 마스터 식별 (Phase 3 · D-025) — **서버 전용.**
+// 마스터 콘솔(/master, /api/master)·service-role 전체 조합 뷰 접근 허용 대상.
+// 익명인증 단계엔 이메일이 없을 수 있어 user_id(UUID) 병행 지원.
+// =====================================================================
+
+function parseCsvLower(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/** 마스터 이메일 화이트리스트(소문자). 구글 로그인 후 식별의 1순위. */
+export function getMasterEmails(): string[] {
+  return parseCsvLower(process.env.MASTER_EMAILS);
+}
+
+/** 마스터 user_id(UUID) 화이트리스트(소문자). 익명인증 단계의 임시 식별. */
+export function getMasterUserIds(): string[] {
+  return parseCsvLower(process.env.MASTER_USER_IDS);
+}
+
+// =====================================================================
 // AI 분석 (Phase 2) — 프로바이더 추상화. 1차 구현체: Gemini(Vertex AI).
 // 모델 교체/사용자 선택을 위해 env 로 프로바이더·모델을 결정한다(D-016).
 // =====================================================================
