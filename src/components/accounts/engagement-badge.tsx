@@ -12,19 +12,23 @@ const TIER_STYLE: Record<
   { badge: string; bar: string }
 > = {
   active: {
-    badge: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    badge:
+      "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30",
     bar: "bg-emerald-500",
   },
   good: {
-    badge: "bg-sky-100 text-sky-700 border-sky-200",
+    badge:
+      "bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30",
     bar: "bg-sky-500",
   },
   average: {
-    badge: "bg-amber-100 text-amber-700 border-amber-200",
+    badge:
+      "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30",
     bar: "bg-amber-500",
   },
   low: {
-    badge: "bg-rose-100 text-rose-700 border-rose-200",
+    badge:
+      "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30",
     bar: "bg-rose-500",
   },
   unknown: {

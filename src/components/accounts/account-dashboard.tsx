@@ -56,8 +56,9 @@ type MetricsResponse = {
   metrics: AccountMetrics;
 };
 
-const FORMAT_COLORS = ["#6366f1", "#06b6d4", "#f59e0b", "#ec4899", "#94a3b8"];
-const BAR_COLOR = "#6366f1";
+const FORMAT_COLORS = ["#e1306c", "#962fbf", "#fa7e1e", "#4f5bd5", "#06b6d4"];
+const BAR_COLOR = "#d62976";
+const WEEKDAY_BAR_COLOR = "#962fbf";
 
 function fmt(n: number | null | undefined): string {
   if (n == null) return "—";
@@ -74,10 +75,12 @@ function StatCard({
   sub?: string;
 }) {
   return (
-    <div className="bg-muted/40 rounded-lg border p-3">
+    <div className="bg-muted/40 border-border/60 rounded-xl border p-3.5 transition-colors hover:bg-muted/70">
       <p className="text-muted-foreground text-xs">{label}</p>
-      <p className="mt-1 text-lg font-semibold tracking-tight">{value}</p>
-      {sub && <p className="text-muted-foreground text-xs">{sub}</p>}
+      <p className="mt-1 text-xl font-bold tracking-tight tabular-nums">
+        {value}
+      </p>
+      {sub && <p className="text-muted-foreground mt-0.5 text-xs">{sub}</p>}
     </div>
   );
 }
@@ -177,7 +180,7 @@ export function AccountDashboard({
 
       <header>
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight">
             @{account.username}
           </h1>
           <Badge
@@ -442,7 +445,11 @@ export function AccountDashboard({
                     formatter={(value) => [`${value}개`, "게시물"]}
                     labelFormatter={(l) => `${l}요일`}
                   />
-                  <Bar dataKey="count" fill="#06b6d4" radius={[2, 2, 0, 0]} />
+                  <Bar
+                    dataKey="count"
+                    fill={WEEKDAY_BAR_COLOR}
+                    radius={[2, 2, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>

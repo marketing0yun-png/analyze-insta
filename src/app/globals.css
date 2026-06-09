@@ -4,56 +4,97 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.75rem;
+
+  /* ── 인스타 바이브 브랜드 그라데이션 (전 화면 공용) ── */
+  --gradient-brand: linear-gradient(
+    135deg,
+    #fa7e1e 0%,
+    #e1306c 45%,
+    #c13584 68%,
+    #833ab4 100%
+  );
+  --gradient-brand-soft: linear-gradient(
+    135deg,
+    #feda75 0%,
+    #fa7e1e 22%,
+    #e1306c 52%,
+    #962fbf 80%,
+    #4f5bd5 100%
+  );
+  /* 텍스트용 — 밝은 오렌지를 빼 흰 배경에서도 또렷하게 읽힌다. */
+  --gradient-brand-text: linear-gradient(
+    120deg,
+    #e1306c 0%,
+    #c13584 46%,
+    #7a2bbf 100%
+  );
+
+  --background: oklch(0.99 0.006 330);
+  --foreground: oklch(0.18 0.02 300);
+  --card: oklch(0.995 0.004 330);
+  --card-foreground: oklch(0.18 0.02 300);
+  --popover: oklch(1 0.003 330);
+  --popover-foreground: oklch(0.18 0.02 300);
+  --primary: oklch(0.515 0.244 352);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.012 330);
+  --secondary-foreground: oklch(0.3 0.03 330);
+  --muted: oklch(0.965 0.008 330);
+  --muted-foreground: oklch(0.448 0.026 318);
+  --accent: oklch(0.95 0.02 340);
+  --accent-foreground: oklch(0.3 0.04 340);
+  --destructive: oklch(0.58 0.23 25);
+  --border: oklch(0.882 0.014 330);
+  --input: oklch(0.91 0.012 330);
+  --ring: oklch(0.515 0.244 352);
+  --chart-1: oklch(0.65 0.24 12); /* 핑크/레드 */
+  --chart-2: oklch(0.55 0.22 305); /* 퍼플 */
+  --chart-3: oklch(0.72 0.18 55); /* 오렌지 */
+  --chart-4: oklch(0.7 0.15 200); /* 시안 */
+  --chart-5: oklch(0.55 0.2 265); /* 인디고 */
+  --sidebar: oklch(0.99 0.006 330);
+  --sidebar-foreground: oklch(0.18 0.02 300);
+  --sidebar-primary: oklch(0.515 0.244 352);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.95 0.02 340);
+  --sidebar-accent-foreground: oklch(0.3 0.04 340);
+  --sidebar-border: oklch(0.882 0.014 330);
+  --sidebar-ring: oklch(0.515 0.244 352);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
+  --background: oklch(0.17 0.02 295);
+  --foreground: oklch(0.97 0.006 330);
+  --card: oklch(0.21 0.025 292);
+  --card-foreground: oklch(0.97 0.006 330);
+  --popover: oklch(0.21 0.025 292);
+  --popover-foreground: oklch(0.97 0.006 330);
+  --primary: oklch(0.72 0.2 350);
+  --primary-foreground: oklch(0.16 0.02 300);
+  --secondary: oklch(0.27 0.025 292);
+  --secondary-foreground: oklch(0.97 0.006 330);
+  --muted: oklch(0.26 0.02 292);
+  --muted-foreground: oklch(0.72 0.02 320);
+  --accent: oklch(0.31 0.04 320);
+  --accent-foreground: oklch(0.97 0.006 330);
+  --destructive: oklch(0.7 0.19 22);
+  --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  --ring: oklch(0.72 0.2 350);
+  --chart-1: oklch(0.7 0.24 14);
+  --chart-2: oklch(0.68 0.2 305);
+  --chart-3: oklch(0.78 0.18 60);
+  --chart-4: oklch(0.75 0.15 200);
+  --chart-5: oklch(0.66 0.2 270);
+  --sidebar: oklch(0.21 0.025 292);
+  --sidebar-foreground: oklch(0.97 0.006 330);
+  --sidebar-primary: oklch(0.72 0.2 350);
+  --sidebar-primary-foreground: oklch(0.16 0.02 300);
+  --sidebar-accent: oklch(0.31 0.04 320);
+  --sidebar-accent-foreground: oklch(0.97 0.006 330);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.72 0.2 350);
 }
 
 @theme inline {
@@ -80,6 +121,7 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-brand: var(--primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --radius-sm: calc(var(--radius) - 4px);
@@ -96,5 +138,53 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 트렌디한 얇은 스크롤바 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent)
+      transparent;
+  }
+}
+
+@layer utilities {
+  /* 그라데이션 텍스트 (히어로/섹션 타이틀) — 흰 배경에서도 또렷한 팔레트 사용.
+     클립 미지원 브라우저에서도 글자가 사라지지 않도록 solid 폴백 색을 먼저 둔다. */
+  .text-gradient-brand {
+    color: #c13584;
+    background-image: var(--gradient-brand-text);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+  @supports (-webkit-background-clip: text) or (background-clip: text) {
+    .text-gradient-brand {
+      -webkit-text-fill-color: transparent;
+    }
+  }
+  /* 그라데이션 배경 (CTA 버튼·로고 타일·강조 배지) */
+  .bg-gradient-brand {
+    background-image: var(--gradient-brand);
+  }
+  .bg-gradient-brand-soft {
+    background-image: var(--gradient-brand-soft);
+  }
+  /* 그라데이션 테두리 카드(상단 강조 라인 대용) */
+  .ring-gradient-brand {
+    position: relative;
+  }
+  .ring-gradient-brand::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: var(--gradient-brand);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
   }
 }

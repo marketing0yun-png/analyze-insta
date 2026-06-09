@@ -182,8 +182,11 @@ export function CompareView() {
       {backLink}
 
       <header>
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <Scale className="size-5" /> 매장 비교 분석
+        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+          <span className="bg-gradient-brand inline-flex size-9 items-center justify-center rounded-xl text-white shadow-sm">
+            <Scale className="size-5" />
+          </span>
+          매장 비교 분석
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
           참여율 순으로 정렬됩니다. 비교할 매장을 2~5개 선택하면 LLM이 냉정하게
@@ -227,12 +230,12 @@ export function CompareView() {
                   <div
                     key={it.id}
                     onClick={() => !disabled && toggle(it.id)}
-                    className={`rounded-md border p-2.5 text-sm ${
+                    className={`rounded-xl border p-2.5 text-sm transition-colors ${
                       isBench
-                        ? "border-amber-300 bg-amber-50/60"
+                        ? "border-amber-300 bg-amber-50/60 dark:border-amber-500/40 dark:bg-amber-500/10"
                         : checked
                           ? "border-primary bg-primary/5"
-                          : ""
+                          : "hover:bg-muted/40"
                     } ${disabled ? "opacity-50" : "cursor-pointer"}`}
                   >
                     <div className="flex items-center gap-3">
@@ -287,7 +290,7 @@ export function CompareView() {
                           }}
                           className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
                             isBench
-                              ? "border-amber-300 bg-amber-100 text-amber-700"
+                              ? "border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
                               : "text-muted-foreground hover:bg-muted border-border"
                           }`}
                         >
@@ -521,7 +524,7 @@ function CompareResult({ data }: { data: CompareResponse }) {
                   </span>
                   <span className="font-medium">@{v.username}</span>
                   {s?.isBenchmark && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300">
                       <Star className="size-3 fill-amber-500 text-amber-500" />{" "}
                       벤치마크 목표
                     </span>

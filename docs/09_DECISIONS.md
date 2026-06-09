@@ -202,6 +202,18 @@
 - **날짜:** 2026-06-09
 
 ---
+## D-027. 전 화면 디자인 리뉴얼 — 인스타 바이브 + 라이트/다크 토글
+- **결정:** shadcn 기본(무채색) 테마를 벗고 **인스타그램 시그니처 그라데이션(핑크→퍼플→오렌지)** 기반 디자인 시스템으로 전 화면을 통일. 라이트·다크 둘 다 지원 + 상단 토글. 기능/로직은 그대로, **시각 레이어만** 교체.
+- **토큰(`globals.css`):** primary/ring 를 비비드 마젠타(oklch)로, 배경·카드·보더에 미세한 보라 틴트. 라이트/다크 양쪽 팔레트. 공용 그라데이션 변수 `--gradient-brand`/`--gradient-brand-soft` + 유틸 `.text-gradient-brand`(배경클립 텍스트)·`.bg-gradient-brand(-soft)`·`.ring-gradient-brand`(mask 기반 그라데이션 테두리). 차트 색도 브랜드 팔레트로(대시보드 하드코딩 hex 교체: 포맷/시간대/요일 차트).
+- **테마 방식:** `next-themes` 미도입(의존성 추가 회피). 자체 구현 — layout `<head>`의 **no-flash 인라인 스크립트**가 하이드레이션 전 `.dark` 적용(localStorage `theme` → 없으면 `prefers-color-scheme`). `ThemeProvider`는 `useSyncExternalStore`로 `<html>.dark`(외부 상태)를 **구독만**(effect/synchronous setState 회피 — lint 규칙 `react-hooks/set-state-in-effect` 준수). `ThemeToggle`은 CSS `dark:` 변이로 해/달 아이콘 회전 전환, 라벨만 `suppressHydrationWarning`.
+- **공용 셸:** `AppHeader`(sticky 글래스 바 + 그라데이션 로고 타일 + 토글 + 하단 그라데이션 라인)와 `Background`(고정 `-z-10` 인스타 컬러 블러 메시 3개)를 `layout`에 배치 → 모든 페이지 공통.
+- **프리미티브:** `Card`=글래스(`bg-card/80 backdrop-blur`)+`rounded-2xl`+호버 섀도. `Button` `default`=**브랜드 그라데이션 CTA**(+active scale·brightness 호버). `Input`=`rounded-lg`+브랜드 포커스링. **`Badge` `default`는 솔리드 primary 유지**(그라데이션 X) — 이유: 그라데이션은 `background-image`라 `bg-emerald-600`(연결됨/내 계정/진행중 배지) 같은 `background-color` 오버라이드를 덮어버려 의미색이 깨짐. 색-vs-색은 tailwind-merge가 정상 병합.
+- **화면별:** 홈=그라데이션 히어로(+로드맵 카드 그라데이션 넘버칩/진행중 ring). 로그인 카드=`ring-gradient-brand` + 풀폭 lg CTA. 대시보드 StatCard 리파인 + 차트 브랜드색. 비교/마스터 헤더=그라데이션 아이콘 타일. 다크모드 미흡했던 amber/engagement 배지에 `dark:` 변이 추가.
+- **검증:** `npm run lint`/`typecheck`/`build`(23 라우트) 통과.
+- **라이트 대비 보정(후속):** 다크가 기본으로 떠 라이트 모드 가독성이 약하다는 피드백 반영. 라이트 토큰 강화 — `--foreground` 0.21→0.18, `--muted-foreground` 0.52→0.448(전역 보조텍스트 또렷), `--primary`/`--ring` 0.58→0.515(마젠타 액센트·text-primary 대비↑), `--border` 0.90→0.882. 헤딩 그라데이션은 흰 배경에서 흐릿한 오렌지를 뺀 `--gradient-brand-text`(핑크→퍼플)로 분리 + 클립 미지원 폴백 색. 라이트 배경 글로우 강도 ↓(텍스트 영역 클린 유지, 다크는 유지). 다크 팔레트 불변.
+- **날짜:** 2026-06-09
+
+---
 ## 미해결/추후 결정
 - [ ] 로그인 프로바이더 최종 확정(구글 단독 vs 구글+카카오) — 현재 구글 우선 가정.
 - [ ] 서드파티 공급사 선정(Phase 4 시점).

@@ -54,7 +54,7 @@ export function SignInCard() {
   }
 
   return (
-    <Card className="border-primary/40 w-full">
+    <Card className="ring-gradient-brand bg-card/90 w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <LogIn className="size-4" /> 구글로 시작하기
@@ -66,7 +66,12 @@ export function SignInCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
-        <Button onClick={handleSignIn} disabled={busy || status === "loading"}>
+        <Button
+          size="lg"
+          className="w-full"
+          onClick={handleSignIn}
+          disabled={busy || status === "loading"}
+        >
           {busy ? <Loader2 className="animate-spin" /> : <LogIn />}
           구글로 로그인하고 시작
         </Button>

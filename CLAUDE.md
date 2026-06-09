@@ -35,6 +35,7 @@
 4. **Phase 4** 서드파티 PoC → 외부 경쟁사 조회수·댓글내용 보강
 
 ## 현재 상태
+- **디자인 리뉴얼(D-027) 완료(로컬):** 전 화면 **인스타 바이브 그라데이션 + 라이트/다크 토글**. 자체 테마(layout no-flash 스크립트 + `ThemeProvider`=`useSyncExternalStore`, `next-themes` 미도입) + 공용 `AppHeader`/`Background`(`layout`) + 프리미티브 교체(Card 글래스·Button 그라데이션 CTA·brand 토큰/유틸 `globals.css`). Badge default는 솔리드 유지(emerald 의미색 보존). 기능 로직 불변. `lint`/`typecheck`/`build`(23라우트) 통과. 상세 `docs/09_DECISIONS.md` D-027.
 - **배포 완료 + 익명 폐기→구글 로그인 게이트 + 데모(목업) 모드(D-026) 구현 완료(로컬) — 운영자 Supabase Google OAuth 설정 후 활성화.** `npm run build`/lint 통과.
 - **인증 D-026:** 익명인증 자동 생성 제거. **3단계 = 데모(비로그인, 목업만)→체험계정(로그인+오너 토큰, 2h 한도)→개인 토큰(무제한+노출·도달).** `AuthProvider.signInWithGoogle`/`signOut`/`isAuthenticated` + `/auth/callback`(PKCE 교환) + `SignInCard`. 비로그인 홈=`DemoHome` 미리보기, `/accounts/demo`=`lib/demo/demo-data.ts` 목업 대시보드(`AccountDashboard` `demoData` prop). `ConnectCard`에 체험계정(관리자 토큰·횟수 제한) 안내(요청 2). **운영자 잔여:** Supabase Google provider 활성화 + Redirect URL `<origin>/auth/callback`(`docs/12_GUIDE_GOOGLE_LOGIN.md`).
 - **Phase 1 + Phase 2(콘텐츠 분석) + Phase 2.5(매장 비교) + Phase 3 핵심(내 계정 노출·도달) + Phase 3.5(미터 코어 D-024 + 잔여 게이트·마스터 콘솔·오너 토큰 폴백 D-025) 구현 완료(로컬) — 사용자 검수 단계.**

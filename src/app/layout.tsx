@@ -3,7 +3,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { AppHeader } from "@/components/layout/app-header";
+import { Background } from "@/components/layout/background";
 import { PWARegister } from "@/components/pwa-register";
+import { ThemeProvider } from "@/components/theme/theme-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,12 +32,21 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1426" },
+  ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
 };
+
+/**
+ * 테마 깜빡임(FOUC) 방지 — React 하이드레이션 전에 .dark 를 미리 적용한다.
+ * 저장값이 없으면 OS 설정(prefers-color-scheme)을 따른다.
+ */
+const themeScript = `(function(){try{var t=localStorage.getItem('theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;var e=document.documentElement;if(d){e.classList.add('dark');e.style.colorScheme='dark';}else{e.style.colorScheme='light';}}catch(e){}})();`;
 
 export default function RootLayout({
   children,
@@ -44,11 +56,21 @@ export default function RootLayout({
   return (
     <html
       lang="ko"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="bg-background text-foreground min-h-full flex flex-col">
-        <AuthProvider>{children}</AuthProvider>
-        <PWARegister />
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="bg-background text-foreground flex min-h-full flex-col">
+        <ThemeProvider>
+          <AuthProvider>
+            <Background />
+            <AppHeader />
+            {children}
+            <PWARegister />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

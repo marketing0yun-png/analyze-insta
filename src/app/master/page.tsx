@@ -63,9 +63,9 @@ type MasterData = {
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-md border p-3">
+    <div className="bg-muted/40 border-border/60 rounded-xl border p-3.5">
       <p className="text-muted-foreground text-xs">{label}</p>
-      <p className="text-xl font-semibold tabular-nums">{value}</p>
+      <p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>
     </div>
   );
 }
@@ -127,8 +127,11 @@ export default function MasterPage() {
             <ArrowLeft /> 홈
           </Link>
         </Button>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <ShieldCheck className="size-6" /> 마스터 콘솔
+        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+          <span className="bg-gradient-brand inline-flex size-9 items-center justify-center rounded-xl text-white shadow-sm">
+            <ShieldCheck className="size-5" />
+          </span>
+          마스터 콘솔
         </h1>
         <p className="text-muted-foreground mt-2 text-sm">
           전 사용자 조합 뷰(service-role). 사용량·계정·해시태그 신청을 관리합니다.
