@@ -7,6 +7,7 @@ import {
   type PostForAnalysis,
   analyzeContent,
 } from "./content-analysis";
+import { toPersonaCategory } from "./personas";
 
 /**
  * 계정 콘텐츠 분석 오케스트레이터 (Phase 2) — **서버 전용**.
@@ -17,6 +18,7 @@ import {
  * 호출부에서 tracked_account 소유권을 먼저 검증한 뒤 넘겨야 한다(collect.ts 와 동일 사상).
  */
 
+const ACCOUNTS = "analyze_insta_tracked_accounts";
 const MEDIA = "analyze_insta_media_posts";
 const METRICS = "analyze_insta_post_metrics";
 const ANALYSIS = "analyze_insta_content_analysis";
@@ -78,6 +80,14 @@ export async function analyzeTrackedAccount(
   accountId: string,
   opts: { reanalyze?: boolean; vision?: boolean; limit?: number } = {}
 ): Promise<AnalyzeAccountResult> {
+  // 0) 계정의 페르소나 카테고리 — 카테고리별 분석 프롬프트 선택(D-028 후속).
+  const { data: accountRow } = await admin
+    .from(ACCOUNTS)
+    .select("persona_category")
+    .eq("id", accountId)
+    .maybeSingle();
+  const category = toPersonaCategory(accountRow?.persona_category);
+
   // 1) 대상 게시물 + 최신 지표(최신순, 상한 적용).
   const { data: mediaRows, error: mediaError } = await admin
     .from(MEDIA)
@@ -164,6 +174,7 @@ export async function analyzeTrackedAccount(
 
   const { results, model, usage, imagesAnalyzed } = await analyzeContent(posts, {
     vision: opts.vision,
+    category,
   });
 
   // 4) 적재 — 멱등: 대상 media_post 의 기존 분석을 지우고 새로 삽입(재분석 중복 방지).

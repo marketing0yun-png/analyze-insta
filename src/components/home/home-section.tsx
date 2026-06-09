@@ -1,6 +1,7 @@
 "use client";
 
 import { AccountsCard } from "@/components/accounts/accounts-card";
+import { CompareHeroCard } from "@/components/accounts/compare-hero-card";
 import { useAuth } from "@/components/auth/auth-provider";
 import { SignInCard } from "@/components/auth/sign-in-card";
 import { ConnectCard } from "@/components/credentials/connect-card";
@@ -29,6 +30,7 @@ export function HomeSection() {
           <ConnectCard />
           <UsageMeterCard />
           <AccountsCard />
+          <CompareHeroCard />
           <HashtagCard />
         </>
       )}

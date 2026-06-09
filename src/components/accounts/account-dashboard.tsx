@@ -25,6 +25,7 @@ import {
 
 import { ContentInsights } from "@/components/accounts/content-insights";
 import { EngagementMeter } from "@/components/accounts/engagement-badge";
+import { StrategyDiagnosis } from "@/components/accounts/strategy-diagnosis";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ import {
 } from "@/components/ui/card";
 import type { AccountMetrics } from "@/lib/analytics/account-metrics";
 
-type DashboardTab = "metrics" | "insights";
+type DashboardTab = "metrics" | "insights" | "strategy";
 
 type MetricsResponse = {
   account: {
@@ -223,6 +224,14 @@ export function AccountDashboard({
         >
           콘텐츠 인사이트
         </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={tab === "strategy" ? "default" : "ghost"}
+          onClick={() => setTab("strategy")}
+        >
+          전략 진단
+        </Button>
       </div>
 
       {tab === "insights" ? (
@@ -235,6 +244,17 @@ export function AccountDashboard({
           </Card>
         ) : (
           <ContentInsights id={id} />
+        )
+      ) : tab === "strategy" ? (
+        isDemo ? (
+          <Card>
+            <CardContent className="text-muted-foreground py-8 text-center text-sm">
+              전략 진단(강점·약점·개선책·콘텐츠 아이디어)은 구글 로그인 후 직접
+              분석할 때 제공돼요.
+            </CardContent>
+          </Card>
+        ) : (
+          <StrategyDiagnosis id={id} />
         )
       ) : noData ? (
         <Card>

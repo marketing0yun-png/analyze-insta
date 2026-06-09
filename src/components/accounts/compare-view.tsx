@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  Compass,
   Lightbulb,
   Loader2,
   Scale,
@@ -12,6 +13,7 @@ import {
   ThumbsDown,
   ThumbsUp,
   Trophy,
+  Users,
   Wrench,
 } from "lucide-react";
 
@@ -60,6 +62,7 @@ type CompareSummary = {
 type AccountVerdict = {
   username: string;
   rank: number;
+  category: string;
   strengths: string[];
   weaknesses: string[];
   recommendations: string[];
@@ -69,6 +72,8 @@ type AccountVerdict = {
 type ComparisonReport = {
   summary: string;
   keyDifferences: string[];
+  commonStrengths: string[];
+  commonWeaknesses: string[];
   opportunities: string[];
   accounts: AccountVerdict[];
   model: string;
@@ -403,6 +408,71 @@ function ListBlock({
   );
 }
 
+/** 팔로워 규모별 기대 참여율(engagement-benchmark.ts 와 동일 기준). */
+const BENCHMARK_ROWS: { band: string; benchmark: string }[] = [
+  { band: "1만 미만", benchmark: "4.0%" },
+  { band: "1만~10만", benchmark: "2.5%" },
+  { band: "10만~100만", benchmark: "1.5%" },
+  { band: "100만 이상", benchmark: "1.0%" },
+];
+
+const GRADE_ROWS: { label: string; cut: string; cls: string }[] = [
+  { label: "활발", cut: "기대치의 2배 이상", cls: "text-emerald-600" },
+  { label: "양호", cut: "기대치 이상", cls: "text-emerald-600" },
+  { label: "평균", cut: "기대치의 절반 이상", cls: "text-muted-foreground" },
+  { label: "다소 낮음", cut: "기대치의 절반 미만", cls: "text-amber-600" },
+];
+
+/** 참여율 공식 + 규모별 기대치 + 등급 컷 범례(접이식 — 반발감 완화). */
+function GradeLegend() {
+  return (
+    <details className="bg-muted/30 group mt-3 rounded-md border text-xs">
+      <summary className="text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-1.5 p-2.5 font-medium select-none">
+        <Scale className="size-3.5" /> 참여율 공식 · 등급 기준 보기
+      </summary>
+      <div className="space-y-3 border-t p-3">
+        <div>
+          <p className="font-medium">참여율 공식</p>
+          <p className="text-muted-foreground mt-1 font-mono text-[11px]">
+            참여율(%) = (좋아요 + 댓글) ÷ 팔로워 × 100
+          </p>
+        </div>
+        <div>
+          <p className="font-medium">규모별 기대 참여율</p>
+          <p className="text-muted-foreground mt-0.5 mb-1.5 text-[11px]">
+            계정이 클수록 평균 참여율은 구조적으로 낮아 규모별로 다르게 봅니다.
+          </p>
+          <table className="w-full">
+            <tbody className="text-muted-foreground">
+              {BENCHMARK_ROWS.map((r) => (
+                <tr key={r.band} className="border-b last:border-0">
+                  <td className="py-1">{r.band}</td>
+                  <td className="py-1 text-right font-medium">{r.benchmark}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <p className="font-medium">등급 기준 (해당 규모 기대치 대비)</p>
+          <table className="mt-1.5 w-full">
+            <tbody>
+              {GRADE_ROWS.map((r) => (
+                <tr key={r.label} className="border-b last:border-0">
+                  <td className={`py-1 font-medium ${r.cls}`}>{r.label}</td>
+                  <td className="text-muted-foreground py-1 text-right">
+                    {r.cut}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 function CompareResult({ data }: { data: CompareResponse }) {
   const { report, accounts } = data;
   const summaryByUser = new Map(accounts.map((a) => [a.username, a]));
@@ -470,6 +540,7 @@ function CompareResult({ data }: { data: CompareResponse }) {
               ))}
             </tbody>
           </table>
+          <GradeLegend />
         </CardContent>
       </Card>
 
@@ -498,6 +569,31 @@ function CompareResult({ data }: { data: CompareResponse }) {
                   <li key={i}>{d}</li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* 비교군 공통 진단 — 전원이 잘하거나 부족한 점(객관 기준). */}
+          {(report.commonStrengths.length > 0 ||
+            report.commonWeaknesses.length > 0) && (
+            <div className="bg-muted/40 space-y-3 rounded-md border p-3">
+              <p className="flex items-center gap-1.5 text-xs font-medium">
+                <Users className="size-3.5" /> 비교군 공통 진단
+                <span className="text-muted-foreground font-normal">
+                  (대상 전체에 해당)
+                </span>
+              </p>
+              <ListBlock
+                icon={<ThumbsUp className="size-3" />}
+                title="모두 잘하는 점"
+                items={report.commonStrengths}
+                tone="good"
+              />
+              <ListBlock
+                icon={<ThumbsDown className="size-3" />}
+                title="모두 부족한 점"
+                items={report.commonWeaknesses}
+                tone="bad"
+              />
             </div>
           )}
 
@@ -542,6 +638,14 @@ function CompareResult({ data }: { data: CompareResponse }) {
                     </>
                   )}
                 </div>
+                {v.category && (
+                  <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
+                    <Compass className="mt-0.5 size-3 shrink-0" />
+                    <span>
+                      <span className="font-medium">카테고리:</span> {v.category}
+                    </span>
+                  </p>
+                )}
                 <ListBlock
                   icon={<ThumbsUp className="size-3" />}
                   title="강점"

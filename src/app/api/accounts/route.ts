@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
+import { toPersonaCategory } from "@/lib/ai/personas";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { ACCOUNT_LIMITS, getExternalAccountUsage } from "@/lib/server/usage-meter";
@@ -41,7 +42,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from(ACCOUNTS)
     .select(
-      `id, username, account_kind, access_tier, category_id, ig_id, created_at,
+      `id, username, account_kind, access_tier, category_id, persona_category, ig_id, created_at,
        snapshots:${SNAPSHOTS}(captured_at, followers_count, media_count)`
     )
     .order("created_at", { ascending: false })
@@ -69,6 +70,7 @@ export async function GET() {
       account_kind: row.account_kind,
       access_tier: row.access_tier,
       category_id: row.category_id,
+      persona_category: row.persona_category,
       ig_id: row.ig_id,
       created_at: row.created_at,
       latest_snapshot: latest,
@@ -98,7 +100,11 @@ export async function POST(req: Request) {
     username?: unknown;
     account_kind?: unknown;
     category_name?: unknown;
+    persona_category?: unknown;
   } | null;
+
+  // 분석 페르소나 카테고리(D-028) — 고정 4값. 모르는 값/누락은 'general' 로 폴백.
+  const personaCategory = toPersonaCategory(body?.persona_category);
 
   const username = normalizeUsername(body?.username);
   if (!username) {
@@ -180,9 +186,12 @@ export async function POST(req: Request) {
       username,
       account_kind: accountKind,
       category_id: categoryId,
+      persona_category: personaCategory,
       // access_tier 는 기본 'public'(외부 공개지표). 위임은 별도 흐름에서 승격.
     })
-    .select("id, username, account_kind, access_tier, category_id, ig_id, created_at")
+    .select(
+      "id, username, account_kind, access_tier, category_id, persona_category, ig_id, created_at"
+    )
     .single();
 
   if (error) {

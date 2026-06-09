@@ -13,6 +13,7 @@ import {
   type ContentInsights,
   computeContentInsights,
 } from "@/lib/analytics/content-insights";
+import { type PersonaCategory, toPersonaCategory } from "@/lib/ai/personas";
 
 /**
  * 계정 1개의 지표 + 콘텐츠 인사이트를 **한 번에** 로드하는 공용 서버 헬퍼.
@@ -31,6 +32,8 @@ export type AccountRef = {
   username: string;
   account_kind: "competitor" | "influencer" | "owned";
   access_tier: "public" | "delegated";
+  /** 분석 페르소나 카테고리(D-028 후속). 없으면 'general'. */
+  persona_category: PersonaCategory;
 };
 
 export type AccountReport = {
@@ -99,7 +102,7 @@ export async function loadAccountReport(
 ): Promise<AccountReport | null> {
   const { data: account, error: accError } = await supabase
     .from(ACCOUNTS)
-    .select("id, username, account_kind, access_tier")
+    .select("id, username, account_kind, access_tier, persona_category")
     .eq("id", id)
     .maybeSingle();
   if (accError) throw accError;
@@ -171,7 +174,13 @@ export async function loadAccountReport(
   const followers = snap?.followers_count ?? null;
 
   return {
-    account: account as AccountRef,
+    account: {
+      id: account.id as string,
+      username: account.username as string,
+      account_kind: account.account_kind as AccountRef["account_kind"],
+      access_tier: account.access_tier as AccountRef["access_tier"],
+      persona_category: toPersonaCategory(account.persona_category),
+    },
     followers,
     collectedPosts: posts.length,
     metrics: computeAccountMetrics(posts, followers),

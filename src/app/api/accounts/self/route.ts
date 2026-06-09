@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
+import { toPersonaCategory } from "@/lib/ai/personas";
 import { decryptToken } from "@/lib/crypto/token";
 import { MetaApiError, resolveInstagramUser } from "@/lib/meta/client";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -19,7 +20,7 @@ const CHANNEL = "instagram";
  * 토큰 주인 계정이어야 노출·도달 인사이트 호출이 안전하므로, username 은 저장값이 아니라
  * 토큰에서 재해석(resolveInstagramUser)해 ig_id 일치를 보장한다. 이미 있으면 기존 것 반환.
  */
-export async function POST() {
+export async function POST(req: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -30,6 +31,12 @@ export async function POST() {
       { status: 401 }
     );
   }
+
+  // 분석 페르소나 카테고리(D-028) — 내 계정도 카테고리를 가진다. 누락/오류는 'general'.
+  const body = (await req.json().catch(() => null)) as {
+    persona_category?: unknown;
+  } | null;
+  const personaCategory = toPersonaCategory(body?.persona_category);
 
   try {
     const admin = createAdminClient();
@@ -63,7 +70,9 @@ export async function POST() {
     // 이미 등록돼 있으면(외부로 잘못 등록 포함) 내 계정으로 승격해 반환.
     const { data: existing } = await supabase
       .from(ACCOUNTS)
-      .select("id, username, account_kind, access_tier, category_id, ig_id, created_at")
+      .select(
+        "id, username, account_kind, access_tier, category_id, persona_category, ig_id, created_at"
+      )
       .eq("username", username)
       .eq("channel", CHANNEL)
       .maybeSingle();
@@ -79,10 +88,11 @@ export async function POST() {
             account_kind: "owned",
             access_tier: "delegated",
             ig_id: cred.ig_user_id as string,
+            persona_category: personaCategory,
           })
           .eq("id", existing.id as string)
           .select(
-            "id, username, account_kind, access_tier, category_id, ig_id, created_at"
+            "id, username, account_kind, access_tier, category_id, persona_category, ig_id, created_at"
           )
           .single();
         if (upErr) throw upErr;
@@ -104,9 +114,10 @@ export async function POST() {
         account_kind: "owned",
         access_tier: "delegated",
         ig_id: cred.ig_user_id as string,
+        persona_category: personaCategory,
       })
       .select(
-        "id, username, account_kind, access_tier, category_id, ig_id, created_at"
+        "id, username, account_kind, access_tier, category_id, persona_category, ig_id, created_at"
       )
       .single();
     if (error) throw error;

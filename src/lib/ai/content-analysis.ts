@@ -2,6 +2,7 @@ import "server-only";
 
 import { getAIProvider } from ".";
 import { fetchImagePart } from "./fetch-image";
+import { getPersona, type PersonaCategory } from "./personas";
 import { AIError, type ImagePart } from "./types";
 
 /**
@@ -59,14 +60,19 @@ export type AnalyzeContentResult = {
 /** 한 번의 호출에 묶을 게시물 수. 출력 누락·토큰 폭주를 막기 위해 청크 처리. */
 const CHUNK_SIZE = 10;
 
-const SYSTEM_INSTRUCTION = [
-  "당신은 한국 육아용품 매장의 SNS 마케팅 분석가입니다.",
-  "주어진 인스타그램 게시물(캡션·포맷·참여지표와, 일부는 첨부 이미지)을 분석해 마케팅 인사이트를 추출합니다.",
-  "이미지가 첨부된 게시물은 시각 요소(피사체·제품·연출·색감·구도·텍스트오버레이)도 함께 해석해 분석에 반영합니다.",
-  "광고주가 '어떤 주제·소구점·비주얼의 콘텐츠가 반응이 좋은지' 파악하도록 돕는 것이 목표입니다.",
-  "모든 결과 값은 한국어로, 간결하고 구체적으로 작성합니다.",
-  "반드시 지정된 JSON 스키마만 출력하고, 그 외 설명·코드펜스는 출력하지 않습니다.",
-].join(" ");
+/** 카테고리 페르소나를 주입한 시스템 지시. */
+function buildSystemInstruction(category: PersonaCategory): string {
+  const persona = getPersona(category);
+  return [
+    `당신은 ${persona.roleNoun}의 SNS 마케팅 분석가입니다.`,
+    persona.domainContext,
+    "주어진 인스타그램 게시물(캡션·포맷·참여지표와, 일부는 첨부 이미지)을 분석해 마케팅 인사이트를 추출합니다.",
+    "이미지가 첨부된 게시물은 시각 요소(피사체·제품·연출·색감·구도·텍스트오버레이)도 함께 해석해 분석에 반영합니다.",
+    "광고주가 '어떤 주제·소구점·비주얼의 콘텐츠가 반응이 좋은지' 파악하도록 돕는 것이 목표입니다. 위 카테고리 맥락을 평가 기준으로 삼으세요.",
+    "모든 결과 값은 한국어로, 간결하고 구체적으로 작성합니다.",
+    "반드시 지정된 JSON 스키마만 출력하고, 그 외 설명·코드펜스는 출력하지 않습니다.",
+  ].join(" ");
+}
 
 /**
  * 게시물 1건을 프롬프트용 텍스트 블록으로 직렬화.
@@ -231,10 +237,11 @@ async function fetchChunkImages(chunk: PostForAnalysis[]): Promise<{
  */
 export async function analyzeContent(
   posts: PostForAnalysis[],
-  opts: { vision?: boolean } = {}
+  opts: { vision?: boolean; category?: PersonaCategory } = {}
 ): Promise<AnalyzeContentResult> {
   const provider = getAIProvider();
   const useVision = (opts.vision ?? true) && provider.supportsVision;
+  const systemInstruction = buildSystemInstruction(opts.category ?? "general");
   const results: ContentAnalysis[] = [];
   let inputTokens = 0;
   let outputTokens = 0;
@@ -249,7 +256,7 @@ export async function analyzeContent(
     imagesAnalyzed += images.length;
 
     const res = await provider.generateText({
-      system: SYSTEM_INSTRUCTION,
+      system: systemInstruction,
       prompt: buildPrompt(chunk, orderByPostId),
       images: images.length > 0 ? images : undefined,
       json: true,

@@ -18,6 +18,11 @@ import {
 
 import { useAuth } from "@/components/auth/auth-provider";
 import {
+  PERSONA_CATEGORIES,
+  PERSONA_LABELS,
+  type PersonaCategory,
+} from "@/lib/ai/personas";
+import {
   ANALYZE_CHUNK,
   SEC_PER_CHUNK,
   analyzeAccountLooped,
@@ -46,6 +51,7 @@ type Account = {
   account_kind: "competitor" | "influencer" | "owned";
   access_tier: "public" | "delegated";
   category_id: string | null;
+  persona_category: PersonaCategory;
   ig_id: string | null;
   created_at: string;
   latest_snapshot: Snapshot | null;
@@ -111,7 +117,8 @@ export function AccountsCard() {
   const [accounts, setAccounts] = React.useState<Account[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [username, setUsername] = React.useState("");
-  const [category, setCategory] = React.useState("");
+  // 분석 페르소나 카테고리(D-028) — 필수 선택. 빈 값이면 등록 버튼 비활성.
+  const [persona, setPersona] = React.useState<PersonaCategory | "">("");
   const [kind, setKind] = React.useState<"competitor" | "influencer">(
     "competitor"
   );
@@ -171,6 +178,10 @@ export function AccountsCard() {
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
+    if (!persona) {
+      setError("분석 카테고리를 선택하세요.");
+      return;
+    }
     setError(null);
     setAdding(true);
     try {
@@ -180,7 +191,7 @@ export function AccountsCard() {
         body: JSON.stringify({
           username,
           account_kind: kind,
-          category_name: category.trim() || undefined,
+          persona_category: persona,
         }),
       });
       const data = await res.json();
@@ -189,7 +200,6 @@ export function AccountsCard() {
       } else {
         setAccounts((prev) => [data.account as Account, ...prev]);
         setUsername("");
-        setCategory("");
       }
     } catch {
       setError("요청 중 오류가 발생했습니다.");
@@ -200,10 +210,18 @@ export function AccountsCard() {
 
   /** 연결된 토큰의 본인 계정을 "내 계정"으로 등록(노출·도달 분석 대상). */
   async function handleAddSelf() {
+    if (!persona) {
+      setError("분석 카테고리를 선택하세요.");
+      return;
+    }
     setError(null);
     setAddingSelf(true);
     try {
-      const res = await fetch("/api/accounts/self", { method: "POST" });
+      const res = await fetch("/api/accounts/self", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ persona_category: persona }),
+      });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "내 계정 등록에 실패했습니다.");
@@ -425,23 +443,31 @@ export function AccountsCard() {
         ) : (
           <>
             <form onSubmit={handleAdd} className="space-y-2">
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  placeholder="username (예: instagram)"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  disabled={adding}
-                  className="sm:flex-1"
-                />
-                <Input
-                  placeholder="카테고리(선택)"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  disabled={adding}
-                  className="sm:w-40"
-                />
-              </div>
+              <Input
+                placeholder="username (예: instagram)"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={adding}
+              />
               <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={persona}
+                  onChange={(e) =>
+                    setPersona(e.target.value as PersonaCategory | "")
+                  }
+                  disabled={adding || addingSelf}
+                  className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+                  aria-label="분석 카테고리(필수)"
+                >
+                  <option value="" disabled>
+                    분석 카테고리 *
+                  </option>
+                  {PERSONA_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {PERSONA_LABELS[c]}
+                    </option>
+                  ))}
+                </select>
                 <select
                   value={kind}
                   onChange={(e) =>
@@ -454,7 +480,10 @@ export function AccountsCard() {
                   <option value="competitor">경쟁사</option>
                   <option value="influencer">인플루언서</option>
                 </select>
-                <Button type="submit" disabled={adding || !username.trim()}>
+                <Button
+                  type="submit"
+                  disabled={adding || !username.trim() || !persona}
+                >
                   {adding ? (
                     <>
                       <Loader2 className="animate-spin" /> 등록 중…
@@ -469,7 +498,7 @@ export function AccountsCard() {
                   type="button"
                   variant="outline"
                   onClick={handleAddSelf}
-                  disabled={addingSelf}
+                  disabled={addingSelf || !persona}
                   title="연결된 토큰의 본인 계정을 노출·도달 분석 대상으로 등록"
                 >
                   {addingSelf ? (
@@ -483,6 +512,10 @@ export function AccountsCard() {
                   )}
                 </Button>
               </div>
+              <p className="text-muted-foreground text-xs">
+                분석 카테고리는 AI 페르소나(육아·반려동물·금융 등)를 결정합니다 —
+                정확한 진단을 위해 실제 업종을 고르세요.
+              </p>
             </form>
 
             {error && (

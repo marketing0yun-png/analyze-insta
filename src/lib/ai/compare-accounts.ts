@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getAIProvider } from ".";
+import { getPersona, type PersonaCategory } from "./personas";
 import { AIError } from "./types";
 import { gradeEngagement } from "@/lib/analytics/engagement-benchmark";
 import type { AccountReport } from "@/lib/server/account-report";
@@ -17,6 +18,8 @@ import type { AccountReport } from "@/lib/server/account-report";
 export type CompareSummary = {
   username: string;
   kind: "competitor" | "influencer" | "owned";
+  /** 분석 페르소나 카테고리(D-028 후속) — 비교 페르소나 선택용. */
+  personaCategory: PersonaCategory;
   /** 사용자가 '벤치마크(따라잡을 목표)'로 지정했는지. 나머지는 '개선 대상'. */
   isBenchmark: boolean;
   followers: number | null;
@@ -39,6 +42,8 @@ export type AccountVerdict = {
   username: string;
   /** 참여율 자동 순위(1=상위). */
   rank: number;
+  /** 분석 게시물로 추론한 이 계정의 카테고리·방향성(한 줄). 콘텐츠 아이디어의 근거. */
+  category: string;
   strengths: string[];
   weaknesses: string[];
   recommendations: string[];
@@ -51,6 +56,10 @@ export type ComparisonReport = {
   summary: string;
   /** 차원별 핵심 차이(참여율·소구점·포맷·업로드 등). */
   keyDifferences: string[];
+  /** 비교대상 **전원**이 공통으로 잘하는 점(없으면 빈 배열). */
+  commonStrengths: string[];
+  /** 비교대상 **전원**이 공통으로 부족한 점(객관적 개선 여지). */
+  commonWeaknesses: string[];
   /** 비교 전반에서 발견된 기회·다음 액션(분석에서 끝내지 않기). */
   opportunities: string[];
   accounts: AccountVerdict[];
@@ -69,6 +78,7 @@ export function summarizeForCompare(
   return {
     username: report.account.username,
     kind: report.account.account_kind,
+    personaCategory: report.account.persona_category,
     isBenchmark,
     followers: report.followers,
     engagementRate: m.engagementRate,
@@ -98,16 +108,71 @@ export function rankByEngagement(summaries: CompareSummary[]): CompareSummary[] 
   });
 }
 
-const SYSTEM_INSTRUCTION = [
-  "당신은 한국 육아용품 매장의 SNS 마케팅 전략가입니다.",
-  "여러 인스타그램 계정의 공개지표·콘텐츠 전략을 비교해 **냉정하고 솔직한** 진단을 내립니다.",
-  "근거 없는 칭찬은 금지하고, 약점과 개선책을 구체적으로 지적합니다.",
-  "'노출/도달'은 '내 계정'으로 표시된 계정에만 주어집니다 — 주어지지 않은(외부) 계정엔 추정·언급하지 마세요.",
-  "참여율은 **규모(팔로워) 대비 등급**으로 판단하세요. 큰 계정은 참여율이 구조적으로 낮으니,",
-  "절대 수치만 보고 '낮다'고 단정하지 말고 각 계정에 주어진 등급(활발/양호/평균/다소 낮음)을 존중하세요.",
-  "분석에서 끝내지 말고 **무엇을 더 시도해야 할지(구체 콘텐츠 아이디어·다음 액션)** 까지 제시하세요.",
-  "모든 값은 한국어로, 지정된 JSON 스키마만 출력합니다(코드펜스·설명 금지).",
+/**
+ * 객관성 가드레일 — 비교(여러 계정)·단일 진단 양쪽이 공유.
+ * 핵심: "비교군 안의 1등"을 칭찬하는 상대평가가 아니라, **각 계정의 절대 등급**을
+ * 1차 근거로 삼아 환각 없이 냉정하게 평가하게 만든다(비교군이 전부 허접할 수 있음).
+ */
+export const OBJECTIVITY_RULES = [
+  "강점/약점은 **비교군 순위가 아니라 각 계정의 절대 등급(활발/양호/평균/다소 낮음)**을 1차 근거로 삼으세요.",
+  "비교 대상이 전부 '평균/다소 낮음'처럼 부진하다면, '그중 1등'을 강점으로 포장하지 마세요 —",
+  "그 경우 strengths 는 1~2개로 짧게 쓰거나 비워도 됩니다. 근거 없는 칭찬은 금지입니다.",
+  "개선책(recommendations)은 **냉정·객관·현실적**으로. 비교군이 부진하면 '1등을 따라하라'가 아니라",
+  "이 매장의 현재 콘텐츠·규모 단계에서 **객관적으로 무엇이 부족한지**를 그 매장 기준으로 짚으세요.",
+  "데이터에 없는 수치(노출·도달·매출 등)를 지어내지 마세요 — 주어진 지표 안에서만 판단합니다.",
+  "콘텐츠 아이디어(contentIdeas)는 LLM을 제대로 활용하세요: 먼저 분석된 게시물(소구점·포맷·키워드)로",
+  "이 계정의 **카테고리·방향성**을 한 줄로 규정(category)하고, 그 카테고리에서 **인스타에서 구조적으로",
+  "잘 먹히는 포맷·소재**를 기준으로 실행형 아이디어를 주세요. (특정 주간의 실시간 유행이 아니라",
+  "해당 카테고리에서 통하는 콘텐츠 방향 — 모르는 최신 트렌드를 지어내지 말 것.)",
 ].join(" ");
+
+/**
+ * 비교 페르소나 선택 (D-028) — 내 계정 > 벤치마크 > 다수결 > 일반.
+ * 비교는 여러 계정을 한 프롬프트에 넣으므로 평가자 관점(카테고리)을 하나로 정해야 한다.
+ * 광고주 시점이 곧 '내 계정'이라 그것을 1순위로, 없으면 벤치마크, 그래도 없으면 다수결
+ * (동률·혼재 시 잘못된 도메인 편향을 피해 '일반')으로 폴백한다.
+ */
+export function pickComparePersona(summaries: CompareSummary[]): PersonaCategory {
+  const owned = summaries.find((s) => s.kind === "owned");
+  if (owned) return owned.personaCategory;
+  const bench = summaries.find((s) => s.isBenchmark);
+  if (bench) return bench.personaCategory;
+
+  const counts = new Map<PersonaCategory, number>();
+  for (const s of summaries) {
+    counts.set(s.personaCategory, (counts.get(s.personaCategory) ?? 0) + 1);
+  }
+  let best: PersonaCategory = "general";
+  let bestN = -1;
+  let tie = false;
+  for (const [cat, n] of counts) {
+    if (n > bestN) {
+      best = cat;
+      bestN = n;
+      tie = false;
+    } else if (n === bestN) {
+      tie = true;
+    }
+  }
+  return tie ? "general" : best;
+}
+
+/** 카테고리 페르소나를 주입한 비교 평가 시스템 지시. */
+function buildSystemInstruction(category: PersonaCategory): string {
+  const persona = getPersona(category);
+  return [
+    `당신은 ${persona.roleNoun}의 SNS 마케팅 전략가입니다.`,
+    persona.domainContext,
+    "여러 인스타그램 계정의 공개지표·콘텐츠 전략을 위 카테고리 맥락에서 비교해 **냉정하고 솔직한** 진단을 내립니다.",
+    "'노출/도달'은 '내 계정'으로 표시된 계정에만 주어집니다 — 주어지지 않은(외부) 계정엔 추정·언급하지 마세요.",
+    "참여율은 **규모(팔로워) 대비 등급**으로 판단하세요. 큰 계정은 참여율이 구조적으로 낮으니,",
+    "절대 수치만 보고 '낮다'고 단정하지 말고 각 계정에 주어진 등급(활발/양호/평균/다소 낮음)을 존중하세요.",
+    OBJECTIVITY_RULES,
+    "비교대상 **전원**이 공통으로 잘하는 점/부족한 점이 있으면 commonStrengths·commonWeaknesses 로 따로 뽑으세요.",
+    "분석에서 끝내지 말고 **무엇을 더 시도해야 할지(구체 콘텐츠 아이디어·다음 액션)** 까지 제시하세요.",
+    "모든 값은 한국어로, 지정된 JSON 스키마만 출력합니다(코드펜스·설명 금지).",
+  ].join(" ");
+}
 
 function fmt(n: number | null): string {
   return n == null ? "N/A" : String(n);
@@ -166,17 +231,22 @@ function buildPrompt(ranked: CompareSummary[]): string {
     blocks.join("\n\n"),
     "",
     "아래 JSON 객체로만 응답하세요. accounts 는 위 계정 전부를 포함합니다.",
+    "commonStrengths·commonWeaknesses 는 **비교대상 전원**이 공통으로 잘하거나 부족한 점만 담고,",
+    "공통점이 없으면 빈 배열로 두세요(억지로 채우지 말 것).",
     "{",
-    '  "summary": "전체 비교 한 줄 총평(신랄하게)",',
+    '  "summary": "전체 비교 한 줄 총평(신랄하게, 비교군 전반 수준을 객관적으로)",',
     '  "keyDifferences": ["계정 간 핵심 차이(참여율 등급/소구점/포맷/업로드 관점)", "..."],',
+    '  "commonStrengths": ["비교대상 전원이 공통으로 잘하는 점(없으면 빈 배열)", "..."],',
+    '  "commonWeaknesses": ["비교대상 전원이 공통으로 부족한 점(객관적 개선 여지)", "..."],',
     '  "opportunities": ["비교에서 드러난 기회·다음 액션(상위 계정이 하고 하위가 안 하는 것 등, 실행형)", "..."],',
     '  "accounts": [',
     "    {",
     '      "username": "계정명(@ 없이)",',
-    '      "strengths": ["강점", "..."],',
+    '      "category": "분석 게시물로 추론한 이 계정의 카테고리·방향성(한 줄)",',
+    '      "strengths": ["강점(절대 등급 기준, 없으면 빈 배열)", "..."],',
     '      "weaknesses": ["약점(구체적으로)", "..."],',
-    '      "recommendations": ["개선책(실행 가능하게)", "..."],',
-    '      "contentIdeas": ["당장 시도할 구체 콘텐츠 아이디어(포맷·소재까지)", "..."]',
+    '      "recommendations": ["개선책(이 매장 기준 객관·현실적, 수치 날조 금지)", "..."],',
+    '      "contentIdeas": ["category 기준 인스타에서 잘 통하는 포맷·소재의 실행형 아이디어", "..."]',
     "    }",
     "  ]",
     "}",
@@ -203,14 +273,16 @@ function stripFence(text: string): string {
  * 순위는 참여율 기준으로 매긴 뒤 LLM 에 넘기고, 평가 결과를 순위와 병합한다.
  */
 export async function compareAccounts(
-  summaries: CompareSummary[]
+  summaries: CompareSummary[],
+  personaCategory?: PersonaCategory
 ): Promise<ComparisonReport> {
   const ranked = rankByEngagement(summaries);
   const rankByUser = new Map(ranked.map((s, i) => [s.username, i + 1]));
+  const category = personaCategory ?? pickComparePersona(summaries);
 
   const provider = getAIProvider();
   const res = await provider.generateText({
-    system: SYSTEM_INSTRUCTION,
+    system: buildSystemInstruction(category),
     prompt: buildPrompt(ranked),
     json: true,
     temperature: 0.3,
@@ -225,6 +297,8 @@ export async function compareAccounts(
   const obj = (parsed ?? {}) as {
     summary?: unknown;
     keyDifferences?: unknown;
+    commonStrengths?: unknown;
+    commonWeaknesses?: unknown;
     opportunities?: unknown;
     accounts?: unknown;
   };
@@ -238,6 +312,7 @@ export async function compareAccounts(
     verdictByUser.set(username, {
       username,
       rank: rankByUser.get(username)!,
+      category: asString(item.category),
       strengths: asStringArray(item.strengths),
       weaknesses: asStringArray(item.weaknesses),
       recommendations: asStringArray(item.recommendations),
@@ -251,6 +326,7 @@ export async function compareAccounts(
       verdictByUser.set(s.username, {
         username: s.username,
         rank: rankByUser.get(s.username)!,
+        category: "",
         strengths: [],
         weaknesses: [],
         recommendations: [],
@@ -264,6 +340,8 @@ export async function compareAccounts(
   return {
     summary: asString(obj.summary),
     keyDifferences: asStringArray(obj.keyDifferences),
+    commonStrengths: asStringArray(obj.commonStrengths),
+    commonWeaknesses: asStringArray(obj.commonWeaknesses),
     opportunities: asStringArray(obj.opportunities),
     accounts,
     model: res.model,

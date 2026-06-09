@@ -214,6 +214,29 @@
 - **날짜:** 2026-06-09
 
 ---
+## D-028. 비교분석 객관성 고도화 + 단일 계정 전략 진단 + 부각·기준표
+- **배경(사용자 피드백 4건):** ① 비교분석이 좋은 기능인데 디자인적으로 묻힘. ② 평가가 비교군 내 **상대평가**라, 대상이 전부 허접하면 '그중 1등'을 강점으로 포장하는 환각 우려 → **객관(절대 등급) 기준** 강제 필요. ③ 참여율 순위만 보여주고 **공식·등급 기준표**가 없어 반발감. ④ 개별 분석에도 강점/약점/개선책+아이디어를 원함.
+- **② 프롬프트 객관성(`lib/ai/compare-accounts.ts`):** 공유 가드레일 `OBJECTIVITY_RULES` 신설 — "강점/약점은 비교 순위가 아니라 **각 계정의 절대 등급(활발/양호/평균/다소 낮음)**을 1차 근거로. 전원이 부진하면 strengths 짧게/비워도 됨(억지 칭찬 금지). 개선책은 이 매장 기준 객관·현실적, **데이터에 없는 수치 날조 금지**. 콘텐츠 아이디어는 게시물로 **카테고리 추론 → 그 카테고리에서 구조적으로 잘 통하는 포맷·소재** 기준(모르는 실시간 유행 날조 금지)". `ComparisonReport`에 `commonStrengths`/`commonWeaknesses`(비교대상 **전원** 공통 진단), `AccountVerdict`에 `category`(추론 카테고리 한 줄) 추가. UI(`compare-view`)에 "비교군 공통 진단" 블록 + 계정별 카테고리 라인.
+- **④ 단일 계정 전략 진단(신규):** `lib/ai/diagnose-account.ts`(`diagnoseAccount` — `OBJECTIVITY_RULES` 공유, 비교 대상 없이 **절대 등급만**으로 category/강점/약점/개선책/아이디어). `GET/POST /api/accounts/strategy`(GET=캐시 조회+미터 상태, POST=LLM 실행). **분석·비교 미터(llm) 1칸** 소비(`getMeterStatus`/`recordUsage`) — 비교와 동일 풀. 결과는 `reports(kind='diagnosis')`에 적재·캐시(payload.account_id 로 조회, **시각 컬럼은 `generated_at`**). 대시보드 3번째 탭 **'전략 진단'**(`StrategyDiagnosis`, 온디맨드 '전략 진단 실행' 버튼 + '다시 진단'). 인사이트=관찰된 사실 / 전략 진단=판단·처방으로 탭 분리. 데모·미분석은 안내만.
+- **① 부각(`CompareHeroCard`):** 홈 로그인 영역에 그라데이션 히어로 카드(`bg-gradient-brand`) — 계정 2개 이상이면 "비교 시작" CTA, 미만이면 보이되 비활성 + "2개 이상 등록하면 열려요(현재 N개)" 안내. `AccountsCard` 헤더의 기존 소형 버튼은 유지(빠른 진입). `home-section` AccountsCard 아래 배치.
+- **③ 기준표(`compare-view` `GradeLegend`):** 정량 비교표 하단에 접이식(`<details>`) 범례 — 공식 `참여율(%) = (좋아요+댓글) ÷ 팔로워 × 100` + 규모별 기대치표(1만 미만 4% / 1만~10만 2.5% / 10만~100만 1.5% / 100만+ 1%) + 등급 컷(활발 2배↑ / 양호 1배↑ / 평균 0.5배↑ / 다소 낮음 0.5배 미만). `engagement-benchmark.ts` 와 동일 기준 하드코딩(표시 전용).
+- **마이그레이션:** 불필요 — `reports.kind` 는 `text`(체크 제약 없음), 진단 결과는 기존 `payload` jsonb 안에서 처리.
+- **검증:** `npm run lint`/`typecheck`/`build`(24 라우트, `/api/accounts/strategy` 추가) 통과.
+- **날짜:** 2026-06-09
+
+---
+## D-029. 카테고리별 분석 페르소나(고정 4종) — 육아 전용 탈피
+- **배경:** 분석의 "두뇌"(LLM 시스템 프롬프트) 3곳(`content-analysis`·`compare-accounts`·`diagnose-account`)이 "한국 육아용품 매장 전략가/분석가"로 **하드코딩**돼 다른 업종엔 색안경이 끼었다. 수집·지표·해시태그 인프라는 원래 카테고리 무관.
+- **결정:** `{카테고리}` 통칭 템플릿 대신 **고정 4종 페르소나를 완전 하드코딩**한다(카테고리마다 타깃·소구점·잘 통하는 콘텐츠·규제가 달라 통칭은 품질 저하). 4종 = **parenting(육아/출산)·pet(반려동물)·finance(금융/보험)·general(일반)**. 금융/보험은 광고 규제(수익률·보장 단정 금지·고지 의무)를 페르소나에 명시 → 규제 소지 콘텐츠를 강점이 아닌 위험으로 지적.
+- **중앙화:** `src/lib/ai/personas.ts`에 4 페르소나(`roleNoun`+`domainContext`)를 모으고 `getPersona`/`toPersonaCategory`/`PERSONA_LABELS` 제공. 3개 프롬프트가 공유(내용은 하드코딩, 정의 위치만 단일화 — 12벌 중복 방지). 각 프롬프트는 `"당신은 {roleNoun}의 SNS 마케팅 분석가/전략가입니다" + domainContext`로 조립하고, "위 카테고리 맥락을 평가 기준으로 삼으라" 지시.
+- **저장:** `analyze_insta_tracked_accounts.persona_category`(text, 기본 'general', CHECK 4값) 컬럼 신설. 마이그레이션 `20260611000001_persona_category.sql` — **공용 프로젝트 적용 완료**(기존 19개 계정 → 'parenting' 백필). 자유텍스트 `categories`/`category_id` 기존 메커니즘은 건드리지 않고 분리 유지.
+- **배선:** `AccountReport.account.persona_category` 추가(`account-report` 로드 시 정규화) → `summarizeForCompare`가 `CompareSummary.personaCategory`로 전달. `analyzeTrackedAccount`는 계정 행에서 직접 조회해 `analyzeContent({category})`로. `/api/accounts`·`/api/accounts/self` POST 가 `persona_category` 수용·검증·적재(self 는 promote 시도 갱신).
+- **비교 페르소나 선택(`pickComparePersona`):** 비교는 여러 계정을 한 프롬프트에 넣으므로 평가자 관점 1개 필요 → **내 계정(owned) > 벤치마크 > 다수결 > 일반**(동률·혼재 시 잘못된 도메인 편향 회피로 'general'). `compareAccounts(summaries, persona?)` 가 미지정 시 이 규칙으로 폴백.
+- **UI:** `AccountsCard` 등록 폼의 자유텍스트 카테고리 입력을 **필수 드롭다운(4종)**으로 교체 — 외부 계정 추가·내 계정 추가 모두 카테고리 미선택 시 버튼 비활성. 안내 문구로 "AI 페르소나 결정 — 실제 업종 선택" 명시.
+- **검증:** `npm run lint`/`typecheck`/`build`(24 라우트) 통과 + 마이그레이션 적용·백필 확인.
+- **날짜:** 2026-06-09
+
+---
 ## 미해결/추후 결정
 - [ ] 로그인 프로바이더 최종 확정(구글 단독 vs 구글+카카오) — 현재 구글 우선 가정.
 - [ ] 서드파티 공급사 선정(Phase 4 시점).
