@@ -190,6 +190,18 @@
 - **날짜:** 2026-06-09
 
 ---
+## D-026. 익명인증 폐기 → 구글 로그인 게이트 + 데모(목업) 모드
+- **결정:** 배포 후, **익명인증 자동 생성을 폐기**하고 구글 로그인을 실제 이용의 관문으로 둔다. 로그인 전(로그아웃) 방문자는 **고정 목업(데모)** 만 보고, 모든 실기능(토큰 연결·수집·분석·비교·해시태그)은 로그인 후에만 가능하다.
+- **3단계 모델:** ① **데모(비로그인)** — 세션 없이 목업만 열람(조작 불가). ② **체험계정(로그인 + 개인 Meta 토큰 미연결)** — 관리자(오너) 토큰으로 이용, 2시간 한도. ③ **개인 토큰(로그인 + 본인 토큰 연결)** — 수집·지표 무제한 + 내 계정 노출·도달. 티어 판별 로직은 D-024 그대로(본인 credential 유무).
+- **AuthProvider 변경:** `signInAnonymously()` 제거. `getUser()` 결과로 ready(user|null) 결정 — user 있으면 로그인, 없으면 데모. `signInWithGoogle()`(`signInWithOAuth({provider:'google', redirectTo:<origin>/auth/callback})`) + `signOut()` + `isAuthenticated` 노출. 기존 `linkGoogle`/`isAnonymous`/`GoogleLinkCard` 폐기(익명 보존 마이그레이션 불필요 — 베타 테스터 소수).
+- **OAuth 콜백:** `/auth/callback` route(`exchangeCodeForSession`) 추가 — PKCE code→세션 교환 후 홈 리다이렉트. Supabase Redirect URL 에 `<origin>/auth/callback` 등록 필요.
+- **데모 목업:** `lib/demo/demo-data.ts`(육아용품 매장 시나리오 — 내 계정 1 + 경쟁사 2, 노출·도달 포함). 홈 비로그인 = `DemoHome`(사용량·계정 미리보기 "예시" 배지 + `/accounts/demo` 진입). 대시보드 `AccountDashboard`에 `demoData` prop(있으면 API 호출 없이 렌더 + 데모 배너, 인사이트 탭은 로그인 유도). `/accounts/[id]`에서 id="demo" 분기.
+- **체험계정 인지(요청 2):** `ConnectCard`에 미연결(=체험) 시 "체험계정으로 이용 중 — 관리자(오너) 토큰으로 이용, 사용 횟수 제한" 경고 박스. 개인 토큰 연결 유도.
+- **카피 정리:** 익명 관련 안내·에러 문구를 "로그인 필요/구글 로그인"으로 일괄 교체(`SetupStatus`는 ready 시 숨김, 5개 API 401 메시지, AccountsCard).
+- **범위 밖(운영자 작업):** Supabase Google OAuth 활성화 + Redirect URL 등록(docs/12). 미설정 시 로그인 버튼이 에러를 그대로 표시.
+- **날짜:** 2026-06-09
+
+---
 ## 미해결/추후 결정
 - [ ] 로그인 프로바이더 최종 확정(구글 단독 vs 구글+카카오) — 현재 구글 우선 가정.
 - [ ] 서드파티 공급사 선정(Phase 4 시점).

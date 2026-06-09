@@ -114,6 +114,8 @@ export function ConnectCard() {
   }
 
   const connected = connection?.connected === true;
+  // 미연결 = 체험계정(개인 토큰 없음 → 관리자/오너 토큰으로 이용·횟수 제한).
+  const isTrial = authStatus === "ready" && !loadingStatus && !connected;
 
   return (
     <Card className="w-full">
@@ -157,9 +159,24 @@ export function ConnectCard() {
           </div>
         )}
 
+        {isTrial && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-50 p-3 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            <p className="flex items-center gap-1.5 font-medium">
+              <CircleAlert className="size-4" /> 체험계정으로 이용 중
+            </p>
+            <p className="mt-1 text-xs">
+              아직 개인 토큰을 연결하지 않아, 현재{" "}
+              <strong>관리자(오너) 토큰</strong>으로 이용 중이에요. 이 상태에서는{" "}
+              <strong>사용 횟수에 제한이 있습니다</strong>(최근 2시간 수집 5회).
+              아래에 본인 Meta 토큰을 연결하면 수집 제한이 풀리고, 내 계정의
+              노출·도달까지 분석할 수 있어요.
+            </p>
+          </div>
+        )}
+
         {authStatus !== "ready" && (
           <p className="text-muted-foreground">
-            토큰 연결은 세션이 준비된 뒤 가능합니다. (위 익명 인증 상태 확인)
+            토큰 연결은 로그인 후 가능합니다.
           </p>
         )}
 

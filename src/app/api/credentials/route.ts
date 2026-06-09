@@ -76,10 +76,7 @@ export async function POST(req: Request) {
     const userId = await currentUserId();
     if (!userId) {
       return NextResponse.json(
-        {
-          error:
-            "세션이 없습니다. 익명 로그인이 활성화됐는지 확인하세요(Supabase Authentication → Anonymous sign-ins).",
-        },
+        { error: "로그인이 필요합니다. 구글로 로그인한 뒤 다시 시도하세요." },
         { status: 401 }
       );
     }

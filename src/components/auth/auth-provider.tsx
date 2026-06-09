@@ -10,23 +10,27 @@ type AuthStatus = "loading" | "ready" | "unconfigured" | "error";
 
 type AuthContextValue = {
   status: AuthStatus;
+  /** 로그인한 사용자(구글). 로그아웃(데모) 상태면 null. */
   user: User | null;
   error: string | null;
-  /** 현재 세션이 익명인지. 구글 로그인 연결 버튼 노출 판단용. */
-  isAnonymous: boolean;
+  /** 구글로 로그인됐는지. false면 데모(목업) 모드. */
+  isAuthenticated: boolean;
   /**
-   * 익명 세션에 구글 신원 연결(link identity) — 데이터 보존(Phase 3, D-025).
-   * Supabase 대시보드에서 Google OAuth 가 활성화돼 있어야 동작한다(미설정 시 에러 반환).
+   * 구글 로그인 시작 — OAuth 리다이렉트(`/auth/callback`로 복귀).
+   * Supabase 대시보드에서 Google provider가 활성화돼 있어야 동작한다(미설정 시 에러 반환).
    */
-  linkGoogle: () => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
+  /** 로그아웃 → 데모 모드로 복귀. */
+  signOut: () => Promise<void>;
 };
 
 const AuthContext = React.createContext<AuthContextValue>({
   status: "loading",
   user: null,
   error: null,
-  isAnonymous: false,
-  linkGoogle: async () => ({ error: "인증이 초기화되지 않았습니다." }),
+  isAuthenticated: false,
+  signInWithGoogle: async () => ({ error: "인증이 초기화되지 않았습니다." }),
+  signOut: async () => {},
 });
 
 export function useAuth() {
@@ -34,10 +38,10 @@ export function useAuth() {
 }
 
 /**
- * 익명인증 부트스트랩.
- * - Supabase env 미설정 시 앱을 깨지 않고 "unconfigured" 상태로 표시한다.
- * - 세션이 없으면 signInAnonymously()로 백그라운드 식별 → RLS 데이터 격리.
- * - 배포 전 구글 로그인으로 link identity (Phase 3).
+ * 구글 로그인 기반 인증(D-026).
+ * - 익명인증 자동 생성 없음. 로그인 전(데모)에는 세션 없이 목업만 본다.
+ * - 실제 이용(수집·분석·토큰 연결)은 구글 로그인 후에만 가능(서버 라우트가 401로 차단).
+ * - Supabase env 미설정 시 앱을 깨지 않고 "unconfigured" 로 표시한다.
  */
 type CoreState = Pick<AuthContextValue, "status" | "user" | "error">;
 
@@ -48,8 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       : { status: "unconfigured", user: null, error: null }
   );
 
-  /** 익명 → 구글 신원 연결(link identity). 데이터 보존(D-025). */
-  const linkGoogle = React.useCallback(async (): Promise<{
+  const signInWithGoogle = React.useCallback(async (): Promise<{
     error: string | null;
   }> => {
     if (!publicEnv.supabaseUrl || !publicEnv.supabaseAnonKey) {
@@ -58,8 +61,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const supabase = createClient();
       const redirectTo =
-        typeof window !== "undefined" ? window.location.origin : undefined;
-      const { error } = await supabase.auth.linkIdentity({
+        typeof window !== "undefined"
+          ? `${window.location.origin}/auth/callback`
+          : undefined;
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: redirectTo ? { redirectTo } : undefined,
       });
@@ -67,8 +72,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: null };
     } catch (err) {
       return {
-        error: err instanceof Error ? err.message : "구글 연결에 실패했습니다.",
+        error: err instanceof Error ? err.message : "구글 로그인에 실패했습니다.",
       };
+    }
+  }, []);
+
+  const signOut = React.useCallback(async () => {
+    if (!publicEnv.supabaseUrl || !publicEnv.supabaseAnonKey) return;
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      setState({ status: "ready", user: null, error: null });
+    } catch {
+      /* 로그아웃 실패는 조용히 무시 — 다음 새로고침에서 정리 */
     }
   }, []);
 
@@ -83,16 +99,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-
-        if (user) {
-          if (active) setState({ status: "ready", user, error: null });
-          return;
-        }
-
-        const { data, error } = await supabase.auth.signInAnonymously();
-        if (error) throw error;
-        if (active)
-          setState({ status: "ready", user: data.user, error: null });
+        // user 가 있으면 로그인, 없으면 데모(로그아웃) — 둘 다 "ready".
+        if (active) setState({ status: "ready", user: user ?? null, error: null });
       } catch (err) {
         if (active)
           setState({
@@ -123,10 +131,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = React.useMemo<AuthContextValue>(
     () => ({
       ...state,
-      isAnonymous: state.user?.is_anonymous === true,
-      linkGoogle,
+      // 익명인증은 더 이상 생성하지 않음 — user 존재 = 구글 로그인.
+      isAuthenticated: state.user != null && state.user.is_anonymous !== true,
+      signInWithGoogle,
+      signOut,
     }),
-    [state, linkGoogle]
+    [state, signInWithGoogle, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

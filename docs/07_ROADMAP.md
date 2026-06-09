@@ -3,6 +3,10 @@
 > 개발 재개 시 **여기 "다음 할 일"부터** 본다. 작업 완료마다 체크박스/상태 갱신.
 
 ## 현재 상태
+🟢 **배포 완료 + 익명 폐기→구글 로그인 게이트 + 데모(목업) 모드 구현 완료(로컬, build/lint 통과 2026-06-09, D-026) — 운영자 Supabase Google OAuth 설정 후 활성화.**
+- **3단계:** 데모(비로그인, 목업만) → 체험계정(로그인+오너 토큰, 2h 한도) → 개인 토큰(무제한+노출·도달). 비로그인 홈=`DemoHome` 미리보기 + `/accounts/demo` 예시 대시보드. `ConnectCard`에 체험계정(관리자 토큰·횟수 제한) 안내.
+- **운영자 잔여:** Supabase Authentication→Providers→Google 활성화 + URL Configuration 에 `<origin>/auth/callback` 등록(`docs/12_GUIDE_GOOGLE_LOGIN.md`).
+
 🟢 **Phase 3.5 + Phase 3 배포 잔여(마스터·구글로그인 스캐폴딩) 구현 완료(로컬, build/lint 통과 2026-06-09, D-025) — 사용자 검수 대기.**
 - **오너 토큰 폴백(선결 과제 해소):** `META_OWNER_TOKEN` env → `/collect`가 체험 유저 외부 수집을 오너 토큰으로 대행 → **체험 collect 한도(2h 5회) 실제 발동**. 내 계정 노출·도달은 개인 토큰 전용(체험 차단·안내).
 - **잔여 게이트 완성:** 외부 계정 개수(체험 3/개인 10) · 해시태그 체험=신청/개인=검색 · 안내 UI(LLM 비용·혼잡·비교용 1회 남기기).
@@ -108,7 +112,7 @@
       (account-metrics avgReach/avgImpressions/avgSaved/avgVideoViews, 대시보드 "내 계정 인사이트" 카드,
       비교 정량표 도달 열(내 계정만) + 프롬프트 "외부는 추정 금지".)
 - [x] 마스터 콘솔(전체 데이터 조합 뷰) — **구현 완료(D-025)** (`/master` + `GET/POST /api/master`, `isMaster` env 화이트리스트)
-- [~] **익명 → 구글 로그인 교체/연결**(link identity) — **코드 스캐폴딩 완료(D-025)**, Supabase Google OAuth 설정만 남음(`docs/12_GUIDE_GOOGLE_LOGIN.md`)
+- [x] **익명 폐기 → 구글 로그인 게이트 + 데모(목업) 모드** — **구현 완료(D-026)**. 비로그인=데모 목업만, 실이용=구글 로그인 후. `signInWithGoogle`/`signOut`/`/auth/callback`(PKCE 교환) + `DemoHome`/`/accounts/demo` + `ConnectCard` 체험계정 안내. **운영자 잔여:** Supabase Google OAuth 활성화 + Redirect URL `<origin>/auth/callback` 등록(`docs/12_GUIDE_GOOGLE_LOGIN.md`).
 - [ ] Meta 앱 검수(일반 공개 시) / 또는 테스터 한정 운영 결정 — **외부 차단**(휴대폰 인증 보류)
 - [~] 배포 전 보안 체크(`docs/06_AUTH_SECURITY.md` §5) — 토큰암호화·시크릿분리·마스터격리 확인, 구글로그인·Meta검수만 잔여
 - **완료 기준:** MVP 배포 가능. 광고주 본인 계정은 노출까지, 경쟁사는 공개지표로 비교. → **데이터/비교 핵심 구현 완료, 사용자 검수 대기. 배포 잔여(마스터·구글로그인·검수)는 후속.**

@@ -1,13 +1,14 @@
-# 12. 가이드 — 구글 로그인(익명 → 구글 link identity)
+# 12. 가이드 — 구글 로그인(익명 폐기 → 구글 로그인 게이트, D-026)
 
-> Phase 3 배포 잔여. **코드는 스캐폴딩 완료(D-025)** — 아래 외부 설정만 하면 활성화된다.
-> 익명으로 모은 데이터를 보존한 채 구글 신원을 연결한다(link identity).
+> **코드 구현 완료(D-026)** — 아래 외부 설정만 하면 활성화된다.
+> 익명인증은 폐기됐다. 로그인 전엔 데모(목업)만 보이고, 실제 이용은 구글 로그인 후 가능.
 
 ## 현재 상태 (코드)
-- `AuthProvider`(`src/components/auth/auth-provider.tsx`)가 `linkGoogle()`·`isAnonymous`를 노출.
-- `GoogleLinkCard`(`src/components/auth/google-link.tsx`)가 **익명 세션일 때만** 홈에 "구글로 연결" 버튼을 띄움.
-- 버튼은 `supabase.auth.linkIdentity({ provider: 'google' })`를 호출 → OAuth 리다이렉트.
-- ⚠️ **Supabase에 Google OAuth가 설정돼 있지 않으면** 버튼 클릭 시 에러 메시지를 그대로 표시한다(스캐폴딩 단계).
+- `AuthProvider`(`src/components/auth/auth-provider.tsx`)가 `signInWithGoogle()`·`signOut()`·`isAuthenticated`를 노출. 익명인증 자동 생성은 제거됨.
+- `SignInCard`(`src/components/auth/sign-in-card.tsx`)가 홈에서 로그아웃 시 "구글로 시작하기", 로그인 시 이메일+로그아웃을 표시.
+- 버튼은 `supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: <origin>/auth/callback } })`를 호출 → OAuth 리다이렉트.
+- `/auth/callback` route(`src/app/auth/callback/route.ts`)가 PKCE code 를 세션으로 교환(`exchangeCodeForSession`)하고 홈으로 리다이렉트.
+- ⚠️ **Supabase에 Google OAuth가 설정돼 있지 않으면** 버튼 클릭 시 에러 메시지를 그대로 표시한다.
 
 ## 활성화 절차 (운영자 작업)
 
@@ -23,17 +24,16 @@
 ### 2) Supabase — Google provider 활성화
 1. Supabase 대시보드 → **Authentication → Providers → Google → Enable**.
 2. 위 **Client ID / Client Secret** 붙여넣고 저장.
-3. **Authentication → URL Configuration → Redirect URLs** 에 앱 도메인 추가
-   (로컬: `http://localhost:3000`, 배포: Vercel 도메인). `linkGoogle()`는 `window.location.origin`으로 돌아온다.
-
-### 3) (선택) 익명 → 구글 연결 충돌 처리
-- 동일 구글 계정이 이미 다른 사용자에 연결돼 있으면 `linkIdentity`가 에러를 낸다(이메일 중복). 이 경우 일반 로그인(`signInWithOAuth`)으로 전환하는 분기를 추가할 수 있다(현재 스캐폴딩은 link만).
+3. **Authentication → URL Configuration → Redirect URLs** 에 콜백 URL 추가
+   (로컬: `http://localhost:3000/auth/callback`, 배포: `https://<도메인>/auth/callback`).
+   `signInWithGoogle()`는 `window.location.origin + /auth/callback` 으로 돌아온다.
 
 ## 검증 체크리스트
-- [ ] 익명 세션에서 홈에 "구글 계정 연결" 카드가 보인다.
-- [ ] "구글로 연결" → 구글 동의 → 앱으로 복귀 후 `is_anonymous=false`.
-- [ ] 연결 전 등록한 계정/수집 데이터가 그대로 남아 있다(데이터 보존).
-- [ ] 다른 기기에서 같은 구글로 로그인 시 동일 데이터.
+- [ ] 로그아웃 상태 홈에 "구글로 시작하기" 카드 + 데모 목업이 보인다.
+- [ ] "구글로 로그인하고 시작" → 구글 동의 → `/auth/callback` → 홈 복귀 후 로그인 상태(이메일 표시).
+- [ ] 로그인 후 실제 기능 카드(토큰 연결·사용량·계정·해시태그)가 보인다.
+- [ ] 로그아웃 → 다시 데모 모드로 복귀.
+- [ ] 다른 기기에서 같은 구글로 로그인 시 동일 데이터(RLS 격리·동일 user_id).
 
 ## 참고
 - 결정 근거: `docs/06_AUTH_SECURITY.md §1`(구글 우선), `docs/09_DECISIONS.md D-007/D-025`.

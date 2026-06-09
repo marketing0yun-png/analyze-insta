@@ -82,10 +82,20 @@ function StatCard({
   );
 }
 
-export function AccountDashboard({ id }: { id: string }) {
+export function AccountDashboard({
+  id,
+  demoData,
+}: {
+  id: string;
+  /** 데모(목업) 모드 — 제공되면 API 호출 없이 이 데이터를 그대로 렌더(D-026). */
+  demoData?: MetricsResponse;
+}) {
+  const isDemo = demoData != null;
   const { status: authStatus } = useAuth();
-  const [data, setData] = React.useState<MetricsResponse | null>(null);
-  const [loading, setLoading] = React.useState(true);
+  const [data, setData] = React.useState<MetricsResponse | null>(
+    demoData ?? null
+  );
+  const [loading, setLoading] = React.useState(!isDemo);
   const [error, setError] = React.useState<string | null>(null);
   const [tab, setTab] = React.useState<DashboardTab>("metrics");
 
@@ -99,7 +109,7 @@ export function AccountDashboard({ id }: { id: string }) {
   }, [id]);
 
   React.useEffect(() => {
-    if (authStatus !== "ready") return;
+    if (isDemo || authStatus !== "ready") return;
     let active = true;
     (async () => {
       try {
@@ -114,7 +124,7 @@ export function AccountDashboard({ id }: { id: string }) {
     return () => {
       active = false;
     };
-  }, [authStatus, load]);
+  }, [isDemo, authStatus, load]);
 
   const backLink = (
     <Link
@@ -125,7 +135,7 @@ export function AccountDashboard({ id }: { id: string }) {
     </Link>
   );
 
-  if (authStatus !== "ready" || loading) {
+  if (!isDemo && (authStatus !== "ready" || loading)) {
     return (
       <div className="space-y-4">
         {backLink}
@@ -154,6 +164,16 @@ export function AccountDashboard({ id }: { id: string }) {
   return (
     <div className="space-y-5">
       {backLink}
+
+      {isDemo && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+          <p className="font-medium">데모 예시 화면</p>
+          <p className="mt-0.5 text-xs">
+            아래 수치는 실제 데이터가 아닌 <strong>미리 정해진 예시값</strong>이에요.
+            내 인스타 계정의 실제 분석은 구글 로그인 후 이용할 수 있어요.
+          </p>
+        </div>
+      )}
 
       <header>
         <div className="flex items-center gap-2">
@@ -203,7 +223,16 @@ export function AccountDashboard({ id }: { id: string }) {
       </div>
 
       {tab === "insights" ? (
-        <ContentInsights id={id} />
+        isDemo ? (
+          <Card>
+            <CardContent className="text-muted-foreground py-8 text-center text-sm">
+              AI 콘텐츠 인사이트(소구점·톤·키워드)는 구글 로그인 후 직접 분석할
+              때 제공돼요.
+            </CardContent>
+          </Card>
+        ) : (
+          <ContentInsights id={id} />
+        )
       ) : noData ? (
         <Card>
           <CardContent className="text-muted-foreground py-8 text-center text-sm">

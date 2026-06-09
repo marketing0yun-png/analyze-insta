@@ -89,7 +89,7 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json(
-      { error: "세션이 없습니다. 익명 로그인 상태를 확인하세요." },
+      { error: "로그인이 필요합니다. 구글로 로그인한 뒤 다시 시도하세요." },
       { status: 401 }
     );
   }

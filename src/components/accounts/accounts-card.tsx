@@ -420,7 +420,7 @@ export function AccountsCard() {
       <CardContent className="space-y-4 text-sm">
         {authStatus !== "ready" ? (
           <p className="text-muted-foreground">
-            세션이 준비된 뒤 사용할 수 있습니다. (위 익명 인증 상태 확인)
+            로그인 후 사용할 수 있습니다.
           </p>
         ) : (
           <>

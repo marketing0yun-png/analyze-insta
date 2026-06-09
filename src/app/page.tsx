@@ -1,11 +1,6 @@
 import { Activity, TrendingUp } from "lucide-react";
 
-import { AccountsCard } from "@/components/accounts/accounts-card";
-import { GoogleLinkCard } from "@/components/auth/google-link";
-import { ConnectCard } from "@/components/credentials/connect-card";
-import { HashtagCard } from "@/components/hashtags/hashtag-card";
-import { SetupStatus } from "@/components/setup-status";
-import { UsageMeterCard } from "@/components/usage/usage-meter-card";
+import { HomeSection } from "@/components/home/home-section";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -18,7 +13,7 @@ const phases = [
   {
     n: 0,
     title: "스캐폴딩",
-    desc: "Next.js + Tailwind + shadcn/ui + PWA, Supabase 익명인증, 기본 스키마.",
+    desc: "Next.js + Tailwind + shadcn/ui + PWA, Supabase 구글 로그인, 기본 스키마.",
     state: "done" as const,
   },
   {
@@ -81,14 +76,7 @@ export default function Home() {
         </p>
       </header>
 
-      <section className="mb-8 space-y-3">
-        <SetupStatus />
-        <ConnectCard />
-        <GoogleLinkCard />
-        <UsageMeterCard />
-        <AccountsCard />
-        <HashtagCard />
-      </section>
+      <HomeSection />
 
       <section>
         <h2 className="mb-3 text-sm font-medium tracking-tight">로드맵</h2>
