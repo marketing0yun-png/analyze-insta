@@ -18,7 +18,7 @@ import {
 
 import { useAuth } from "@/components/auth/auth-provider";
 import {
-  PERSONA_CATEGORIES,
+  ACTIVE_PERSONA_CATEGORIES,
   PERSONA_LABELS,
   type PersonaCategory,
 } from "@/lib/ai/personas";
@@ -118,7 +118,10 @@ export function AccountsCard() {
   const [loading, setLoading] = React.useState(true);
   const [username, setUsername] = React.useState("");
   // 분석 페르소나 카테고리(D-028) — 필수 선택. 빈 값이면 등록 버튼 비활성.
-  const [persona, setPersona] = React.useState<PersonaCategory | "">("");
+  // 활성 페르소나가 1종(육아 전문 모드)이면 자동 선택해 사용자가 고를 필요가 없다.
+  const [persona, setPersona] = React.useState<PersonaCategory | "">(
+    ACTIVE_PERSONA_CATEGORIES.length === 1 ? ACTIVE_PERSONA_CATEGORIES[0] : "",
+  );
   const [kind, setKind] = React.useState<"competitor" | "influencer">(
     "competitor"
   );
@@ -450,24 +453,31 @@ export function AccountsCard() {
                 disabled={adding}
               />
               <div className="flex flex-wrap items-center gap-2">
-                <select
-                  value={persona}
-                  onChange={(e) =>
-                    setPersona(e.target.value as PersonaCategory | "")
-                  }
-                  disabled={adding || addingSelf}
-                  className="border-input bg-background h-9 rounded-md border px-3 text-sm"
-                  aria-label="분석 카테고리(필수)"
-                >
-                  <option value="" disabled>
-                    분석 카테고리 *
-                  </option>
-                  {PERSONA_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {PERSONA_LABELS[c]}
+                {ACTIVE_PERSONA_CATEGORIES.length === 1 ? (
+                  // 육아 전문 테스트 모드 — 카테고리 고정, 드롭다운 대신 고정 배지.
+                  <span className="border-input bg-muted text-muted-foreground inline-flex h-9 items-center rounded-md border px-3 text-sm">
+                    {PERSONA_LABELS[ACTIVE_PERSONA_CATEGORIES[0]]} 전문
+                  </span>
+                ) : (
+                  <select
+                    value={persona}
+                    onChange={(e) =>
+                      setPersona(e.target.value as PersonaCategory | "")
+                    }
+                    disabled={adding || addingSelf}
+                    className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+                    aria-label="분석 카테고리(필수)"
+                  >
+                    <option value="" disabled>
+                      분석 카테고리 *
                     </option>
-                  ))}
-                </select>
+                    {ACTIVE_PERSONA_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {PERSONA_LABELS[c]}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <select
                   value={kind}
                   onChange={(e) =>
@@ -513,8 +523,9 @@ export function AccountsCard() {
                 </Button>
               </div>
               <p className="text-muted-foreground text-xs">
-                분석 카테고리는 AI 페르소나(육아·반려동물·금융 등)를 결정합니다 —
-                정확한 진단을 위해 실제 업종을 고르세요.
+                {ACTIVE_PERSONA_CATEGORIES.length === 1
+                  ? "현재 육아·출산 전문 분석 모드입니다 — 모든 분석이 육아 페르소나로 진행됩니다."
+                  : "분석 카테고리는 AI 페르소나(육아·반려동물·금융 등)를 결정합니다 — 정확한 진단을 위해 실제 업종을 고르세요."}
               </p>
             </form>
 

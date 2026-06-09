@@ -20,6 +20,14 @@ export const PERSONA_CATEGORIES: PersonaCategory[] = [
   "general",
 ];
 
+/**
+ * UI에서 **사용자가 고를 수 있는** 페르소나(드롭다운 노출 대상).
+ * 현재는 "육아 전문" 테스트 모드라 parenting 1종만 활성화한다.
+ * 반려동물·금융 등을 다시 열려면 이 배열에 카테고리를 추가하면 끝
+ * (정의·프롬프트 로직은 그대로 보존됨 — 비활성 ≠ 삭제).
+ */
+export const ACTIVE_PERSONA_CATEGORIES: PersonaCategory[] = ["parenting"];
+
 /** UI 라벨(드롭다운·배지). */
 export const PERSONA_LABELS: Record<PersonaCategory, string> = {
   parenting: "육아/출산",
