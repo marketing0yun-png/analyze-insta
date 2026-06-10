@@ -248,6 +248,24 @@
 - **날짜:** 2026-06-10
 - **후속(사용자 피드백):** ① **댓글 가중**은 핵심 참여율·벤치마크를 건드리지 않기 위해 **'소통' 축 강화**로 처리 — 만점 기준 댓글비중 **3%→2%**(`INTERACTION_FULL`, 같은 댓글에 더 높은 점수, '댓글 유도→도달' 트렌드 반영). 가중치는 유지. ② **수집 필드 확장(콘텐츠 품질 연구 대비, 재수집이 쿼터·레이트에 묶이므로 미리 적재):** Business Discovery(외부+내 계정)에 **`children`(캐러셀 낱장 id·type·url·thumb)** 추가 → `media_posts.raw`. 해시태그에 **`media_url`+`children`** 추가 → `hashtag_results.raw`(thumbnail_url 은 해시태그 엣지 미지원이라 제외). media_url·thumbnail_url·permalink·timestamp 는 이미 수집 중이었음(thumbnail 은 raw 보관·비전 사용). 전용 컬럼 없이 raw 적재라 **마이그레이션 불필요**. `lint`/`typecheck` 통과.
 
+## D-031. 사용자 토큰 간편 발급 = Facebook Login for Business OAuth (Meta측 셋업 완료 · 구현 예정)
+- **배경:** 탐색기 수동 발급(11_GUIDE STEP 7)은 일반 사용자(오프라인 사장님)에게 난이도가 높고 함정("설정 수정" 옵트인 누락 → `/me/accounts` 빈 배열)이 많음 → **버튼 클릭→페북 동의→자동 저장**으로 대체 결정.
+- **방식 결정:** **Facebook Login for Business**(비즈니스 유형 앱 전용, `config_id` 기반 OAuth 다이얼로그). 신형 **Instagram API with Instagram Login 은 기각** — 페이스북 페이지 없이 발급돼 더 간편하나 **Business Discovery·해시태그 검색 미지원**이라 서비스 핵심(외부 계정 분석)이 불가.
+- **Meta 대시보드 셋업(2026-06-10 완료):** ① 제품 "비즈니스용 Facebook 로그인" 추가 ② 로그인 구성 생성(로그인 버전=**Instagram 그래프 API**, **사용자 액세스 토큰**, 권한 5종) → `config_id=1407928874437388` = `.env.local` `META_LOGIN_CONFIG_ID` ③ 설정(Client/Web OAuth ON·Strict ON, 리디렉션 URI `https://analyze-insta.vercel.app/api/meta/oauth/callback`, localhost는 개발모드 자동 허용).
+- **잔여(재개 지점 = 11-4):** ① `public_profile` 고급 액세스 — 클릭 전환이나 **개인정보처리방침 URL 등록 선행**(앱 설정→기본에 `/privacy`·`/terms` 등록; 페이지는 D-026 때 배포돼 200 확인) ② 라우트 2개(`/api/meta/oauth/start`·`/callback`, state 쿠키 + code→단기→`exchangeLongLivedToken` 재사용) + `ConnectCard` "Facebook으로 연결" 버튼(수동 입력 폴백 유지) ③ 테스터 등록 ④ Vercel env(`META_APP_ID/SECRET/LOGIN_CONFIG_ID`)+Redeploy. **전체 절차 = `docs/11_GUIDE_META.md` STEP 11.**
+- **운영 범위:** 개발 모드(관리자+테스터)로 운영하다가, 일반 공개 시점에 앱 검수(Advanced Access 5종 + 비즈니스 인증) — 기존 방침 유지.
+- **날짜:** 2026-06-10 (셋업) / 구현 미착수
+
+## D-032. 모바일 UX 패스 — 헤더 계정 메뉴 + 순기능 최상단 + 잘림·장문 정리
+- **배경(사용자 피드백, 모바일 실사용 스크린샷 3장):** ① 홈 계정 목록에서 **계정 ID가 잘려** 인지 불가(이탈 우려) ② 로그인·토큰 연결·사용량 카드가 위를 차지해 **순기능(계정 목록)이 페이지 중간**에 묻힘 ③ 비교 화면은 설명 글이 많아 한눈에 안 들어오고 리더보드 계정명도 잘림. PC는 문제 없음 → **앱(React Native) 전환은 기각**(문제는 플랫폼이 아니라 레이아웃·정보 우선순위; 이미 PWA로 앱형 설치 가능). 사용자 제안(설정을 상단 고정 바 버튼으로 + 누르면 확장) 채택하되 **버튼 1개 통합·바텀 시트·상태별 분기**로 다듬음.
+- **① 헤더 계정 메뉴(`layout/account-menu.tsx` 신설, `AppHeader`에 장착):** 미로그인=헤더 "로그인" 버튼(구글 OAuth 직행). 로그인=프로필 버튼+**상태 점**(초록=개인 토큰 연결/주황=체험·미연결/회색 펄스=확인 중). 클릭 → 모바일 **바텀 시트**·PC(sm↑) 우상단 드롭다운 패널(백드롭+blur, Escape·바깥 클릭 닫기, 열림 중 body 스크롤 잠금). 패널 내용 = 로그인 정보(이메일·상태 배지·로그아웃) + `ConnectCard` + `UsageMeterCard` 재사용.
+- **② 토큰 상태 공유 `CredentialsProvider`(`credentials/credentials-provider.tsx` 신설, layout 장착):** `/api/credentials` 조회를 한 곳으로 — 헤더 상태 점·홈 분기·ConnectCard 가 같은 상태를 봄(중복 fetch 제거). `ConnectCard`는 자체 fetch 제거하고 `useCredentials()` 소비, 연결 성공 시 `refresh()`. 미로그인·unconfigured 는 저장값과 무관하게 미연결로 **파생**(effect 동기 setState 회피 — lint `react-hooks/set-state-in-effect`).
+- **③ 홈 상태별 분기(`home-section.tsx`):** 미로그인=SignInCard+DemoHome(기존). 로그인+토큰 미연결=온보딩으로 `ConnectCard`만 본문 상단 노출. 로그인+연결됨=설정 카드 전부 헤더 메뉴로 빠지고 **계정 목록이 최상단**. `UsageMeterCard`는 본문에서 제거(헤더 메뉴 전용). `SignInCard`의 로그인됨 분기(이메일+로그아웃)는 헤더 메뉴로 이전·삭제.
+- **④ 잘림 해결:** 홈 계정 목록 행 = 모바일 **2줄**(1줄 계정명+팔로워 전체 폭, 2줄 수집/분석/삭제 버튼 `pl-6`) / sm↑ 기존 한 줄(`flex-col sm:flex-row`). 비교 리더보드 계정명 = `truncate` 제거 → `break-all`+`flex-wrap`(자르지 않고 줄바꿈).
+- **⑤ 비교 화면 장문 정리:** 헤더 리드 한 문장으로 축약 + 주황 "순서" 박스를 `<details>` 접이식("ⓘ 사용 순서·보이는 데이터 안내")으로. 리더보드 하단 ※ 3개(벤치마크·등급·건강점수)도 `<details>` 접이식으로(기존 `GradeLegend`/`HealthLegend`/`Glossary` 접이식 패턴과 통일). 첫 화면에 리더보드가 바로 보임.
+- **마이그레이션:** 불필요(순수 프론트 레이아웃·상태 공유).
+- **검증:** `npm run lint`/`typecheck`/`build`(24 라우트) 통과.
+- **날짜:** 2026-06-10
 ---
 ## 미해결/추후 결정
 - [ ] 로그인 프로바이더 최종 확정(구글 단독 vs 구글+카카오) — 현재 구글 우선 가정.

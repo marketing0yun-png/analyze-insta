@@ -643,7 +643,8 @@ export function AccountsCard() {
                   const isOwned = a.account_kind === "owned";
                   return (
                     <li key={a.id} className="space-y-2 p-3">
-                      <div className="flex items-center justify-between gap-2">
+                      {/* 모바일: 계정명 줄 + 버튼 줄 2단(잘림 방지, D-032) / sm↑: 기존 한 줄 */}
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex min-w-0 items-start gap-2">
                           <input
                             type="checkbox"
@@ -678,7 +679,7 @@ export function AccountsCard() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-1">
+                        <div className="flex items-center gap-1 pl-6 sm:shrink-0 sm:pl-0">
                           <Button
                             type="button"
                             variant="outline"

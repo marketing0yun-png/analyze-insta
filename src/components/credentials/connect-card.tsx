@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { useCredentials } from "@/components/credentials/credentials-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,14 +21,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-
-type ConnectionStatus = {
-  connected: boolean;
-  ig_user_id?: string;
-  token_expires_at?: string | null;
-  connected_at?: string;
-  reason?: string;
-};
 
 type SubmitResult = {
   ig_user_id: string;
@@ -48,39 +41,17 @@ function formatDate(iso: string | null | undefined): string {
 
 export function ConnectCard() {
   const { status: authStatus } = useAuth();
+  // 연결 상태는 공유 컨텍스트(D-032) — 헤더 계정 메뉴·홈 분기와 동일 소스.
+  const {
+    loading: loadingStatus,
+    connected,
+    connection,
+    refresh,
+  } = useCredentials();
   const [token, setToken] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
-  const [loadingStatus, setLoadingStatus] = React.useState(true);
-  const [connection, setConnection] = React.useState<ConnectionStatus | null>(
-    null
-  );
   const [error, setError] = React.useState<string | null>(null);
   const [result, setResult] = React.useState<SubmitResult | null>(null);
-
-  // 상태 조회(상태 갱신 없이 데이터만). setState는 호출부에서 await 이후에만 한다.
-  const fetchStatus = React.useCallback(async (): Promise<ConnectionStatus> => {
-    const res = await fetch("/api/credentials", { cache: "no-store" });
-    return (await res.json()) as ConnectionStatus;
-  }, []);
-
-  // 세션 준비 시 1회 조회. setState는 모두 await 이후 → effect 동기 setState 회피.
-  React.useEffect(() => {
-    if (authStatus !== "ready") return;
-    let active = true;
-    (async () => {
-      try {
-        const data = await fetchStatus();
-        if (active) setConnection(data);
-      } catch {
-        if (active) setConnection(null);
-      } finally {
-        if (active) setLoadingStatus(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [authStatus, fetchStatus]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -99,12 +70,7 @@ export function ConnectCard() {
       } else {
         setResult(data as SubmitResult);
         setToken("");
-        setLoadingStatus(true);
-        try {
-          setConnection(await fetchStatus());
-        } finally {
-          setLoadingStatus(false);
-        }
+        await refresh();
       }
     } catch {
       setError("요청 중 오류가 발생했습니다.");
@@ -113,7 +79,6 @@ export function ConnectCard() {
     }
   }
 
-  const connected = connection?.connected === true;
   // 미연결 = 체험계정(개인 토큰 없음 → 관리자/오너 토큰으로 이용·횟수 제한).
   const isTrial = authStatus === "ready" && !loadingStatus && !connected;
 

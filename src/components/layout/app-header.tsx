@@ -1,10 +1,11 @@
 import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
+import { AccountMenu } from "@/components/layout/account-menu";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 /**
- * 전 화면 공통 상단 헤더(D-027) — 글래스(블러) 바 + 브랜드 + 테마 토글.
+ * 전 화면 공통 상단 헤더(D-027) — 글래스(블러) 바 + 브랜드 + 계정 메뉴(D-032) + 테마 토글.
  * sticky 로 스크롤 시에도 고정. 하단에 얇은 그라데이션 라인으로 포인트.
  */
 export function AppHeader() {
@@ -23,7 +24,10 @@ export function AppHeader() {
             트렌드 분석기
           </span>
         </Link>
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <AccountMenu />
+          <ThemeToggle />
+        </div>
       </div>
       {/* 얇은 그라데이션 구분선 */}
       <div className="bg-gradient-brand-soft h-px w-full opacity-60" />

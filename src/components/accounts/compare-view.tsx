@@ -284,16 +284,26 @@ export function CompareView() {
           매장 비교 분석
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          참여율(게시물에 반응한 사람 비율)이 높은 순으로 보여드려요. 비교할
-          매장을 2~5개 고르면 AI가 솔직하게 평가해드립니다. (외부 계정은 공개된
-          숫자만, 내 계정은 도달·노출까지 포함)
+          비교할 매장을 2~5개 고르면 AI가 솔직하게 평가해드려요.
         </p>
-        <div className="mt-2 rounded-md border border-amber-300/60 bg-amber-50/60 p-2.5 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
-          <strong>순서:</strong> 각 매장을 <strong>수집 → AI 분석</strong>까지
-          끝낸 뒤 비교하세요. 분석이 안 된 매장은 콘텐츠 평가(소구점·톤·아이디어)가
-          비어 표시됩니다. (분석은 홈의 “선택 수집 &amp; 분석” 또는 각 계정의
-          “콘텐츠 인사이트 → AI 분석”)
-        </div>
+        {/* 긴 안내는 접이식으로 — 모바일 첫 화면에 리더보드가 바로 보이게(D-032) */}
+        <details className="mt-2 rounded-md border border-amber-300/60 bg-amber-50/60 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
+          <summary className="cursor-pointer p-2.5 font-medium select-none">
+            ⓘ 사용 순서 · 보이는 데이터 안내
+          </summary>
+          <div className="space-y-1.5 px-2.5 pb-2.5">
+            <p>
+              <strong>순서:</strong> 각 매장을 <strong>수집 → AI 분석</strong>
+              까지 끝낸 뒤 비교하세요. 분석이 안 된 매장은 콘텐츠
+              평가(소구점·톤·아이디어)가 비어 표시됩니다. (분석은 홈의 “선택
+              수집 &amp; 분석” 또는 각 계정의 “콘텐츠 인사이트 → AI 분석”)
+            </p>
+            <p>
+              순위는 참여율(게시물에 반응한 사람 비율)이 높은 순입니다. 외부
+              계정은 공개된 숫자만, 내 계정은 도달·노출까지 포함해요.
+            </p>
+          </div>
+        </details>
       </header>
 
       {authStatus !== "ready" || loading ? (
@@ -346,8 +356,9 @@ export function CompareView() {
                         {i + 1}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate font-medium">
+                        {/* 계정명은 자르지 않고 줄바꿈 — 모바일에서도 전부 읽히게(D-032) */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-medium break-all">
                             @{it.username}
                           </span>
                           <Badge variant="secondary" className="shrink-0">
@@ -403,20 +414,29 @@ export function CompareView() {
                   </div>
                 );
               })}
-              <p className="text-muted-foreground pt-1 text-xs">
-                ※ 따라잡을 <strong>벤치마크 목표</strong>를 직접 지정하세요(선택).
-                지정하면 나머지 매장이 그 수준에 도달할 방법 중심으로 평가합니다.
-                미지정 시 참여율 순으로 자동 비교합니다.
-              </p>
-              <p className="text-muted-foreground text-xs">
-                ※ 등급은 <strong>팔로워 규모별 기대 참여율</strong>에 견준
-                값입니다. 비즈니스·대형 계정은 평균 참여율이 낮은 게 정상이라
-                규모별로 다르게 평가합니다.
-              </p>
-              <p className="text-muted-foreground text-xs">
-                ※ <strong>건강점수</strong>는 참여율·소통·꾸준함·확산을 합친{" "}
-                <strong>참고용 0~100점</strong>입니다(절대 점수 아님).
-              </p>
+              {/* 긴 ※ 안내는 접이식으로 — 리더보드가 화면을 차지하게(D-032) */}
+              <details className="text-muted-foreground pt-1 text-xs">
+                <summary className="hover:text-foreground cursor-pointer font-medium select-none">
+                  ⓘ 벤치마크 지정 · 등급 · 건강점수 안내
+                </summary>
+                <div className="mt-1.5 space-y-1.5">
+                  <p>
+                    ※ 따라잡을 <strong>벤치마크 목표</strong>를 직접
+                    지정하세요(선택). 지정하면 나머지 매장이 그 수준에 도달할
+                    방법 중심으로 평가합니다. 미지정 시 참여율 순으로 자동
+                    비교합니다.
+                  </p>
+                  <p>
+                    ※ 등급은 <strong>팔로워 규모별 기대 참여율</strong>에 견준
+                    값입니다. 비즈니스·대형 계정은 평균 참여율이 낮은 게
+                    정상이라 규모별로 다르게 평가합니다.
+                  </p>
+                  <p>
+                    ※ <strong>건강점수</strong>는 참여율·소통·꾸준함·확산을 합친{" "}
+                    <strong>참고용 0~100점</strong>입니다(절대 점수 아님).
+                  </p>
+                </div>
+              </details>
               <div className="space-y-2 pt-1">
                 <HealthLegend />
                 <Glossary />

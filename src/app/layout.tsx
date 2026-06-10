@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { CredentialsProvider } from "@/components/credentials/credentials-provider";
 import { AppHeader } from "@/components/layout/app-header";
 import { Background } from "@/components/layout/background";
 import { PWARegister } from "@/components/pwa-register";
@@ -65,10 +66,12 @@ export default function RootLayout({
       <body className="bg-background text-foreground flex min-h-full flex-col">
         <ThemeProvider>
           <AuthProvider>
-            <Background />
-            <AppHeader />
-            {children}
-            <PWARegister />
+            <CredentialsProvider>
+              <Background />
+              <AppHeader />
+              {children}
+              <PWARegister />
+            </CredentialsProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
