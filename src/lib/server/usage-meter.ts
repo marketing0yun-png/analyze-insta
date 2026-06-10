@@ -26,12 +26,12 @@ export const USAGE_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 /**
  * 액션×티어 한도. `null` = 무제한.
- *  - collect: 체험 5 / 개인 무제한 (개인은 본인 Meta 쿼터를 쓰므로 오너 보호 불필요).
- *  - llm:     두 티어 모두 5 공용 (LLM 실비용은 토큰과 무관하게 운영자 부담 → 안 풀림).
+ *  - collect: 체험 10 / 개인 무제한 (개인은 본인 Meta 쿼터를 쓰므로 오너 보호 불필요).
+ *  - llm:     두 티어 모두 10 공용 (LLM 실비용은 토큰과 무관하게 운영자 부담 → 안 풀림).
  */
 export const USAGE_LIMITS: Record<UsageAction, Record<UsageTier, number | null>> = {
-  collect: { trial: 5, personal: null },
-  llm: { trial: 5, personal: 5 },
+  collect: { trial: 10, personal: null },
+  llm: { trial: 10, personal: 10 },
 };
 
 /**

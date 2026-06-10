@@ -132,7 +132,7 @@ export function ConnectCard() {
             <p className="mt-1 text-xs">
               아직 개인 토큰을 연결하지 않아, 현재{" "}
               <strong>관리자(오너) 토큰</strong>으로 이용 중이에요. 이 상태에서는{" "}
-              <strong>사용 횟수에 제한이 있습니다</strong>(최근 2시간 수집 5회).
+              <strong>사용 횟수에 제한이 있습니다</strong>(최근 2시간 수집 10회).
               아래에 본인 Meta 토큰을 연결하면 수집 제한이 풀리고, 내 계정의
               노출·도달까지 분석할 수 있어요.
             </p>
