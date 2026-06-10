@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { Loader2, LogIn, LogOut, UserCircle, X } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -80,14 +81,17 @@ export function AccountMenu() {
         />
       </button>
 
-      {open && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-          onClick={() => setOpen(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="내 계정 패널"
-        >
+      {/* 헤더의 backdrop-blur 가 fixed 의 기준(containing block)이 되므로
+          패널은 포털로 body 에 직접 렌더 — 모바일 시트가 헤더 띠에 갇히는 문제 방지. */}
+      {open &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+            onClick={() => setOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-label="내 계정 패널"
+          >
           <div
             onClick={(e) => e.stopPropagation()}
             className="bg-background absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-2xl border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl sm:inset-x-auto sm:top-16 sm:right-4 sm:bottom-auto sm:w-[26rem] sm:max-h-[80dvh] sm:rounded-2xl sm:border"
@@ -141,8 +145,9 @@ export function AccountMenu() {
               <UsageMeterCard />
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+          document.body
+        )}
     </>
   );
 }
