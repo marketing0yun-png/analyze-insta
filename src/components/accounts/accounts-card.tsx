@@ -9,7 +9,6 @@ import {
   Loader2,
   Plus,
   RefreshCw,
-  Scale,
   Sparkles,
   Trash2,
   UserCircle,
@@ -421,18 +420,10 @@ export function AccountsCard() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="size-4" /> 분석 대상 계정
-          </CardTitle>
-          {accounts.length >= 2 && (
-            <Button asChild variant="outline" size="sm">
-              <Link href="/compare">
-                <Scale /> 비교 분석
-              </Link>
-            </Button>
-          )}
-        </div>
+        {/* 비교 진입은 아래 CompareHeroCard 하나로 — 중복 버튼 제거(D-032 피드백) */}
+        <CardTitle className="flex items-center gap-2">
+          <BarChart3 className="size-4" /> 분석 대상 계정
+        </CardTitle>
         <CardDescription>
           <strong>외부 계정</strong>(경쟁사·인플루언서)은 공개지표만,{" "}
           <strong>내 계정</strong>은 노출·도달까지 분석합니다. 개인계정은 불가.
