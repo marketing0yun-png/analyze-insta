@@ -2,7 +2,7 @@ import "server-only";
 
 import { getAIProvider } from ".";
 import { OBJECTIVITY_RULES, type CompareSummary } from "./compare-accounts";
-import { getPersona, type PersonaCategory } from "./personas";
+import { getPersona, PLAIN_LANGUAGE_RULE, type PersonaCategory } from "./personas";
 import { AIError } from "./types";
 import { gradeEngagement } from "@/lib/analytics/engagement-benchmark";
 
@@ -38,6 +38,7 @@ function buildSystemInstruction(category: PersonaCategory): string {
     "'노출/도달'은 '내 계정'으로 표시될 때만 주어집니다 — 주어지지 않으면 추정·언급하지 마세요.",
     "참여율은 **규모(팔로워) 대비 등급**으로 판단하세요(큰 계정은 구조적으로 낮음).",
     OBJECTIVITY_RULES,
+    PLAIN_LANGUAGE_RULE,
     "분석에서 끝내지 말고 **무엇을 더 시도해야 할지(구체 콘텐츠 아이디어)** 까지 제시하세요.",
     "모든 값은 한국어로, 지정된 JSON 스키마만 출력합니다(코드펜스·설명 금지).",
   ].join(" ");

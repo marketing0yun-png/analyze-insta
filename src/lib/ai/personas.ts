@@ -76,6 +76,19 @@ const PERSONAS: Record<PersonaCategory, Persona> = {
   },
 };
 
+/**
+ * 쉬운 말투 규칙 (D-030) — 3개 프롬프트(content-analysis·compare·diagnose)가 공유.
+ * 독자는 인스타그램에 익숙하지 않은 **오프라인 매장 사장님**이다. 어려운 용어·장황함이
+ * 사용자 경험을 떨어뜨리므로, 쉽고 짧고 실행형으로 쓰게 모델을 고정한다.
+ */
+export const PLAIN_LANGUAGE_RULE = [
+  "독자는 인스타그램에 익숙하지 않은 오프라인 매장 사장님입니다.",
+  "쉽고 친근한 한국어로 쓰되, 전문용어(참여율·도달·노출·릴스·캐러셀·UGC 등)는",
+  "처음 나올 때 괄호로 짧게 풀이하세요(예: 릴스(인스타 짧은 영상)).",
+  "각 항목은 군더더기 없이 한 문장으로, 추상적 조언 대신 '무엇을 어떻게'가 드러나는",
+  "실행형으로 쓰세요. 미사여구·과장은 빼고 핵심만 담습니다.",
+].join(" ");
+
 /** 문자열(DB 값 등)을 안전한 PersonaCategory 로 — 모르는 값은 'general'. */
 export function toPersonaCategory(v: unknown): PersonaCategory {
   return typeof v === "string" && (PERSONA_CATEGORIES as string[]).includes(v)

@@ -167,6 +167,36 @@ export async function resolveInstagramUser(
 // 노출/도달/댓글내용은 제공되지 않는다(외부 계정 한계). 좋아요·댓글수·캡션만.
 // =====================================================================
 
+/** 캐러셀 낱장(자식 미디어). 향후 콘텐츠 품질 연구용으로 raw 에 함께 적재(D-030 후속). */
+export type MediaChild = {
+  id: string;
+  media_type: string | null;
+  media_url: string | null;
+  thumbnail_url: string | null;
+};
+
+/** Graph 응답의 children 낱장 원형. */
+type RawMediaChild = {
+  id: string;
+  media_type?: string;
+  media_url?: string;
+  thumbnail_url?: string;
+};
+
+/** children.data → MediaChild[] (없으면 null). */
+function mapChildren(
+  children?: { data?: RawMediaChild[] }
+): MediaChild[] | null {
+  const data = children?.data;
+  if (!data || data.length === 0) return null;
+  return data.map((c) => ({
+    id: c.id,
+    media_type: c.media_type ?? null,
+    media_url: c.media_url ?? null,
+    thumbnail_url: c.thumbnail_url ?? null,
+  }));
+}
+
 export type BusinessDiscoveryMedia = {
   id: string;
   caption: string | null;
@@ -177,6 +207,8 @@ export type BusinessDiscoveryMedia = {
   media_url: string | null;
   /** 비디오/릴스의 정지 썸네일(이미지). 비전 분석에 사용(D-022). 이미지엔 보통 없음. */
   thumbnail_url: string | null;
+  /** 캐러셀일 때 낱장 목록(이미지/영상). 단일 게시물이면 null. */
+  children: MediaChild[] | null;
   permalink: string | null;
   timestamp: string | null;
 };
@@ -213,6 +245,7 @@ type BusinessDiscoveryResponse = {
         media_product_type?: string;
         media_url?: string;
         thumbnail_url?: string;
+        children?: { data?: Array<RawMediaChild> };
         permalink?: string;
         timestamp?: string;
       }>;
@@ -238,7 +271,8 @@ export async function fetchBusinessDiscovery(
 
   const mediaFields =
     "id,caption,like_count,comments_count,media_type," +
-    "media_product_type,media_url,thumbnail_url,permalink,timestamp";
+    "media_product_type,media_url,thumbnail_url,permalink,timestamp," +
+    "children{id,media_type,media_url,thumbnail_url}";
   const fields =
     `business_discovery.username(${username}){` +
     `followers_count,media_count,biography,name,username,profile_picture_url,` +
@@ -294,6 +328,7 @@ export async function fetchBusinessDiscovery(
       media_product_type: m.media_product_type ?? null,
       media_url: m.media_url ?? null,
       thumbnail_url: m.thumbnail_url ?? null,
+      children: mapChildren(m.children),
       permalink: m.permalink ?? null,
       timestamp: m.timestamp ?? null,
     })),
@@ -325,6 +360,7 @@ type OwnedProfileResponse = {
       media_product_type?: string;
       media_url?: string;
       thumbnail_url?: string;
+      children?: { data?: Array<RawMediaChild> };
       permalink?: string;
       timestamp?: string;
     }>;
@@ -343,7 +379,8 @@ export async function fetchOwnedProfile(
 ): Promise<BusinessDiscoveryProfile> {
   const mediaFields =
     "id,caption,like_count,comments_count,media_type," +
-    "media_product_type,media_url,thumbnail_url,permalink,timestamp";
+    "media_product_type,media_url,thumbnail_url,permalink,timestamp," +
+    "children{id,media_type,media_url,thumbnail_url}";
   const fields =
     "id,username,name,biography,followers_count,follows_count,media_count," +
     `profile_picture_url,media.limit(${mediaLimit}){${mediaFields}}`;
@@ -375,6 +412,7 @@ export async function fetchOwnedProfile(
       media_product_type: m.media_product_type ?? null,
       media_url: m.media_url ?? null,
       thumbnail_url: m.thumbnail_url ?? null,
+      children: mapChildren(m.children),
       permalink: m.permalink ?? null,
       timestamp: m.timestamp ?? null,
     })),
@@ -466,6 +504,9 @@ export type HashtagMedia = {
   like_count: number | null;
   comments_count: number | null;
   media_type: string | null;
+  media_url: string | null;
+  /** 캐러셀 낱장(향후 콘텐츠 연구용). 해시태그 엣지는 썸네일 미지원이라 자식도 url·type만. */
+  children: MediaChild[] | null;
   permalink: string | null;
   timestamp: string | null;
 };
@@ -478,6 +519,8 @@ type HashtagMediaResponse = {
     like_count?: number;
     comments_count?: number;
     media_type?: string;
+    media_url?: string;
+    children?: { data?: Array<RawMediaChild> };
     permalink?: string;
     timestamp?: string;
   }>;
@@ -520,7 +563,9 @@ export async function fetchHashtagMedia(
     token,
     {
       user_id: igUserId,
-      fields: "id,caption,like_count,comments_count,media_type,permalink,timestamp",
+      fields:
+        "id,caption,like_count,comments_count,media_type,media_url," +
+        "children{id,media_type,media_url},permalink,timestamp",
       limit: String(limit),
     }
   );
@@ -530,6 +575,8 @@ export async function fetchHashtagMedia(
     like_count: m.like_count ?? null,
     comments_count: m.comments_count ?? null,
     media_type: m.media_type ?? null,
+    media_url: m.media_url ?? null,
+    children: mapChildren(m.children),
     permalink: m.permalink ?? null,
     timestamp: m.timestamp ?? null,
   }));

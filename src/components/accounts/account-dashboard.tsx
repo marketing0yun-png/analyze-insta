@@ -25,6 +25,7 @@ import {
 
 import { ContentInsights } from "@/components/accounts/content-insights";
 import { EngagementMeter } from "@/components/accounts/engagement-badge";
+import { Glossary } from "@/components/accounts/glossary";
 import { StrategyDiagnosis } from "@/components/accounts/strategy-diagnosis";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Badge } from "@/components/ui/badge";
@@ -544,6 +545,8 @@ export function AccountDashboard({
           </p>
         </>
       )}
+
+      <Glossary />
     </div>
   );
 }

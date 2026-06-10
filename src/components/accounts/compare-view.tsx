@@ -3,8 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import {
+  AlertTriangle,
   ArrowLeft,
   Compass,
+  HeartPulse,
   Lightbulb,
   Loader2,
   Scale,
@@ -18,6 +20,12 @@ import {
 } from "lucide-react";
 
 import { EngagementBadge } from "@/components/accounts/engagement-badge";
+import { Glossary } from "@/components/accounts/glossary";
+import {
+  computeHealthScore,
+  type HealthScore,
+  type HealthTier,
+} from "@/lib/analytics/health-score";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +47,8 @@ type RankItem = {
   avgLikes: number | null;
   avgComments: number | null;
   postsPerWeek: number | null;
+  reelsSharePct: number;
+  avgReach: number | null;
   collectedPosts: number;
   analyzedPosts: number;
 };
@@ -55,6 +65,7 @@ type CompareSummary = {
   analyzedPosts: number;
   avgReach: number | null;
   avgImpressions: number | null;
+  reelsSharePct: number;
   topFormats: { label: string; pct: number }[];
   appealPoints: { label: string; count: number }[];
 };
@@ -99,6 +110,58 @@ function fmt(n: number | null | undefined): string {
 
 const MAX_SELECT = 5;
 
+/** 리더보드 항목 → 건강점수. */
+function healthFromRank(it: RankItem): HealthScore {
+  return computeHealthScore({
+    engagementRate: it.engagementRate,
+    followers: it.followers,
+    avgLikes: it.avgLikes,
+    avgComments: it.avgComments,
+    postsPerWeek: it.postsPerWeek,
+    reelsSharePct: it.reelsSharePct,
+    avgReach: it.avgReach,
+  });
+}
+
+/** 비교 결과 요약 → 건강점수. */
+function healthFromSummary(a: CompareSummary): HealthScore {
+  return computeHealthScore({
+    engagementRate: a.engagementRate,
+    followers: a.followers,
+    avgLikes: a.avgLikes,
+    avgComments: a.avgComments,
+    postsPerWeek: a.postsPerWeek,
+    reelsSharePct: a.reelsSharePct,
+    avgReach: a.avgReach,
+  });
+}
+
+const HEALTH_STYLE: Record<HealthTier, string> = {
+  good: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30",
+  fair: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30",
+  weak: "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30",
+  unknown: "bg-muted text-muted-foreground border-border",
+};
+
+/** 건강점수 배지 — 점수 + 등급. title 에 축별 요약. */
+function HealthBadge({ h, className = "" }: { h: HealthScore; className?: string }) {
+  const title =
+    h.score == null
+      ? h.summary
+      : `${h.summary} · ${h.subs
+          .map((s) => `${s.label} ${s.score ?? "—"}`)
+          .join(" / ")}${h.reachBased ? " (반응=도달기반)" : ""}`;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${HEALTH_STYLE[h.tier]} ${className}`}
+      title={title}
+    >
+      <HeartPulse className="size-3" />
+      {h.score == null ? "건강 측정 전" : `건강 ${h.score} · ${h.label}`}
+    </span>
+  );
+}
+
 export function CompareView() {
   const { status: authStatus } = useAuth();
   const [items, setItems] = React.useState<RankItem[]>([]);
@@ -108,6 +171,7 @@ export function CompareView() {
   const [comparing, setComparing] = React.useState(false);
   const [result, setResult] = React.useState<CompareResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [warnOpen, setWarnOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (authStatus !== "ready") return;
@@ -145,7 +209,7 @@ export function CompareView() {
     );
   }
 
-  async function runCompare() {
+  async function runCompare(ids: string[], benches: string[]) {
     setComparing(true);
     setError(null);
     setResult(null);
@@ -153,7 +217,7 @@ export function CompareView() {
       const res = await fetch("/api/accounts/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: selected, benchmarkIds }),
+        body: JSON.stringify({ ids, benchmarkIds: benches }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -168,10 +232,36 @@ export function CompareView() {
     }
   }
 
-  // 선택했지만 아직 AI 분석 전인 매장(콘텐츠 평가가 비게 됨) — 비교 전 경고.
+  // 선택했지만 아직 AI 분석 전인 매장(콘텐츠 평가가 비게 됨) — 비교 전 차단.
   const selectedUnanalyzed = items.filter(
     (it) => selected.includes(it.id) && it.analyzedPosts === 0
   );
+
+  // 비교 실행 게이트: 미분석 계정이 하나라도 섞여 있으면 알럿 모달로 막는다.
+  function handleCompareClick() {
+    if (selectedUnanalyzed.length > 0) {
+      setWarnOpen(true);
+      return;
+    }
+    runCompare(selected, benchmarkIds);
+  }
+
+  // 모달 액션: 미분석 계정을 선택에서 제외하고, 2개 이상 남으면 곧장 비교.
+  function excludeAndCompare() {
+    const unanalyzedIds = new Set(selectedUnanalyzed.map((it) => it.id));
+    const keptIds = selected.filter((id) => !unanalyzedIds.has(id));
+    const keptBenches = benchmarkIds.filter((id) => !unanalyzedIds.has(id));
+    setSelected(keptIds);
+    setBenchmarkIds(keptBenches);
+    setWarnOpen(false);
+    if (keptIds.length >= 2) {
+      runCompare(keptIds, keptBenches);
+    } else {
+      setError(
+        "분석된 계정이 2개 미만이라 비교할 수 없습니다. 미분석 계정을 먼저 분석한 뒤 다시 시도하세요."
+      );
+    }
+  }
 
   const backLink = (
     <Link
@@ -194,8 +284,9 @@ export function CompareView() {
           매장 비교 분석
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          참여율 순으로 정렬됩니다. 비교할 매장을 2~5개 선택하면 LLM이 냉정하게
-          평가합니다. (외부는 공개지표, 내 계정은 노출·도달까지 포함)
+          참여율(게시물에 반응한 사람 비율)이 높은 순으로 보여드려요. 비교할
+          매장을 2~5개 고르면 AI가 솔직하게 평가해드립니다. (외부 계정은 공개된
+          숫자만, 내 계정은 도달·노출까지 포함)
         </p>
         <div className="mt-2 rounded-md border border-amber-300/60 bg-amber-50/60 p-2.5 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
           <strong>순서:</strong> 각 매장을 <strong>수집 → AI 분석</strong>까지
@@ -271,6 +362,9 @@ export function CompareView() {
                             </span>
                           )}
                         </div>
+                        <div className="mt-1.5">
+                          <HealthBadge h={healthFromRank(it)} />
+                        </div>
                       </div>
                       <div className="shrink-0 text-right">
                         <p className="font-semibold tracking-tight">
@@ -319,13 +413,21 @@ export function CompareView() {
                 값입니다. 비즈니스·대형 계정은 평균 참여율이 낮은 게 정상이라
                 규모별로 다르게 평가합니다.
               </p>
+              <p className="text-muted-foreground text-xs">
+                ※ <strong>건강점수</strong>는 참여율·소통·꾸준함·확산을 합친{" "}
+                <strong>참고용 0~100점</strong>입니다(절대 점수 아님).
+              </p>
+              <div className="space-y-2 pt-1">
+                <HealthLegend />
+                <Glossary />
+              </div>
             </CardContent>
           </Card>
 
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              onClick={runCompare}
+              onClick={handleCompareClick}
               disabled={selected.length < 2 || comparing}
             >
               {comparing ? <Loader2 className="animate-spin" /> : <Scale />}
@@ -368,6 +470,88 @@ export function CompareView() {
           {result && <CompareResult data={result} />}
         </>
       )}
+
+      {warnOpen && (
+        <UnanalyzedWarnModal
+          accounts={selectedUnanalyzed}
+          onExclude={excludeAndCompare}
+          onClose={() => setWarnOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * 비교 실행을 막는 알럿 모달 — 선택 중 미분석 계정이 있을 때 띄운다.
+ * 사용자는 ① 미분석 제외 후 비교, ② 닫고 먼저 분석 중 하나를 골라야 한다.
+ */
+function UnanalyzedWarnModal({
+  accounts,
+  onExclude,
+  onClose,
+}: {
+  accounts: RankItem[];
+  onExclude: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <Card
+        className="w-full max-w-md"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <span className="inline-flex size-8 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
+              <AlertTriangle className="size-4" />
+            </span>
+            미분석 계정이 포함돼 있어요
+          </CardTitle>
+          <CardDescription>
+            아래 계정은 AI 분석 전이라 콘텐츠 평가가 비어 나옵니다. 정확한 비교를
+            위해 분석을 먼저 끝내거나, 제외하고 진행하세요.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <ul className="space-y-1.5">
+            {accounts.map((it) => (
+              <li
+                key={it.id}
+                className="flex items-center gap-2 rounded-lg border border-amber-300/60 bg-amber-50/60 px-2.5 py-1.5 text-sm dark:bg-amber-950/20"
+              >
+                <AlertTriangle className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span className="font-medium">@{it.username}</span>
+                <span className="text-muted-foreground ml-auto text-xs">
+                  AI 분석 필요
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-col gap-2 sm:flex-row-reverse">
+            <Button type="button" onClick={onExclude} className="sm:flex-1">
+              미분석 제외하고 비교
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="sm:flex-1"
+            >
+              닫고 먼저 분석하기
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            ※ 분석은 홈의 “선택 수집 &amp; 분석” 또는 각 계정의 “콘텐츠 인사이트 →
+            AI 분석”에서 실행할 수 있어요.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -473,6 +657,100 @@ function GradeLegend() {
   );
 }
 
+/** 건강점수 4개 축·가중·만점 기준 범례(접이식) + "참고 점수" 고지. */
+const HEALTH_AXES: {
+  name: string;
+  wExt: string;
+  wOwned: string;
+  means: string;
+  full: string;
+}[] = [
+  {
+    name: "반응",
+    wExt: "20%",
+    wOwned: "40%",
+    means: "참여율(반응한 사람 비율)이 규모 대비 높은가",
+    full: "규모별 기대치의 2배 이상 (내 계정은 도달 대비로 더 정확히)",
+  },
+  {
+    name: "소통",
+    wExt: "30%",
+    wOwned: "20%",
+    means: "댓글이 활발한가 (좋아요보다 진한 관심)",
+    full: "댓글 비중 2% 이상",
+  },
+  {
+    name: "꾸준함",
+    wExt: "25%",
+    wOwned: "20%",
+    means: "업로드를 꾸준히 하는가",
+    full: "주 3회 이상",
+  },
+  {
+    name: "확산",
+    wExt: "25%",
+    wOwned: "20%",
+    means: "릴스(짧은 영상)로 새 고객에게 닿는가",
+    full: "릴스 비중 30% 이상",
+  },
+];
+
+function HealthLegend() {
+  return (
+    <details className="bg-muted/30 group mt-3 rounded-md border text-xs">
+      <summary className="text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-1.5 p-2.5 font-medium select-none">
+        <HeartPulse className="size-3.5" /> 건강점수란? · 계산 기준 보기
+      </summary>
+      <div className="space-y-3 border-t p-3">
+        <p className="text-muted-foreground">
+          좋아요·참여율 하나만 보면 놓치는 부분이 많아, 공개된 숫자로 계산되는 4가지를
+          합쳐 <strong>0~100점</strong>으로 보여드려요. 절대 점수가 아니라{" "}
+          <strong>참고용 신호</strong>예요.
+        </p>
+        <table className="w-full">
+          <thead>
+            <tr className="text-muted-foreground border-b text-left">
+              <th className="py-1 pr-2 font-medium">항목</th>
+              <th className="py-1 pr-2 text-center font-medium">
+                비중
+                <br />
+                <span className="font-normal">외부·내계정</span>
+              </th>
+              <th className="py-1 pr-2 font-medium">무엇을 보나</th>
+              <th className="py-1 text-right font-medium">만점 기준</th>
+            </tr>
+          </thead>
+          <tbody className="text-muted-foreground">
+            {HEALTH_AXES.map((a) => (
+              <tr key={a.name} className="border-b last:border-0 align-top">
+                <td className="py-1.5 pr-2 font-medium whitespace-nowrap">
+                  {a.name}
+                </td>
+                <td className="py-1.5 pr-2 text-center whitespace-nowrap">
+                  {a.wExt} · {a.wOwned}
+                </td>
+                <td className="py-1.5 pr-2">{a.means}</td>
+                <td className="py-1.5 text-right">{a.full}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-muted-foreground">
+          ※ <strong>외부 계정은 ‘반응(참여율)’의 신뢰도가 낮아</strong>(저장·공유·도달을
+          알 수 없음) 비중을 20%로 낮추고 소통·꾸준함·확산을 키웠어요. 내 계정은
+          도달까지 알 수 있어 반응을 40%로 봅니다.
+        </p>
+        <p className="text-muted-foreground">
+          ※ 70점↑ <span className="text-emerald-600">좋음</span> · 45점↑{" "}
+          <span className="text-amber-600">보통</span> · 그 미만{" "}
+          <span className="text-rose-600">주의</span>. 데이터가 없는 항목은 빼고
+          나머지로 계산해요.
+        </p>
+      </div>
+    </details>
+  );
+}
+
 function CompareResult({ data }: { data: CompareResponse }) {
   const { report, accounts } = data;
   const summaryByUser = new Map(accounts.map((a) => [a.username, a]));
@@ -493,6 +771,7 @@ function CompareResult({ data }: { data: CompareResponse }) {
                 <th className="py-1.5 pr-2 font-medium">매장</th>
                 <th className="py-1.5 pr-2 text-right font-medium">참여율</th>
                 <th className="py-1.5 pr-2 text-center font-medium">등급</th>
+                <th className="py-1.5 pr-2 text-center font-medium">건강점수</th>
                 <th className="py-1.5 pr-2 text-right font-medium">평균반응</th>
                 {showReach && (
                   <th className="py-1.5 pr-2 text-right font-medium">
@@ -524,6 +803,9 @@ function CompareResult({ data }: { data: CompareResponse }) {
                       followers={a.followers}
                     />
                   </td>
+                  <td className="py-1.5 pr-2 text-center">
+                    <HealthBadge h={healthFromSummary(a)} />
+                  </td>
                   <td className="py-1.5 pr-2 text-right">
                     {fmt((a.avgLikes ?? 0) + (a.avgComments ?? 0))}
                   </td>
@@ -541,6 +823,7 @@ function CompareResult({ data }: { data: CompareResponse }) {
             </tbody>
           </table>
           <GradeLegend />
+          <HealthLegend />
         </CardContent>
       </Card>
 

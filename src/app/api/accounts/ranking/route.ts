@@ -48,6 +48,9 @@ export async function GET() {
       avgLikes: r.metrics.avgLikes,
       avgComments: r.metrics.avgComments,
       postsPerWeek: r.metrics.postsPerWeek,
+      // 건강점수 재료(D-030): 릴스 비중 + 도달기반 반응(내 계정만, 외부는 null).
+      reelsSharePct: r.metrics.formats.find((f) => f.kind === "reel")?.pct ?? 0,
+      avgReach: r.metrics.avgReach,
       collectedPosts: r.collectedPosts,
       analyzedPosts: r.insights.analyzedPosts,
     }))

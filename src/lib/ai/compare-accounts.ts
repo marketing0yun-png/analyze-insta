@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getAIProvider } from ".";
-import { getPersona, type PersonaCategory } from "./personas";
+import { getPersona, PLAIN_LANGUAGE_RULE, type PersonaCategory } from "./personas";
 import { AIError } from "./types";
 import { gradeEngagement } from "@/lib/analytics/engagement-benchmark";
 import type { AccountReport } from "@/lib/server/account-report";
@@ -31,6 +31,8 @@ export type CompareSummary = {
   /** 내 계정(delegated)만 — 노출·도달 평균. 외부는 null(D-023). */
   avgReach: number | null;
   avgImpressions: number | null;
+  /** 릴스 비중(%) — 건강점수 '확산' 축 재료(D-030). */
+  reelsSharePct: number;
   topFormats: { label: string; pct: number }[];
   appealPoints: { label: string; count: number }[];
   tones: { label: string; count: number }[];
@@ -89,6 +91,7 @@ export function summarizeForCompare(
     // 노출·도달은 내 계정만 — 외부엔 없음(추정 금지를 위해 null 고정).
     avgReach: isOwned ? m.avgReach : null,
     avgImpressions: isOwned ? m.avgImpressions : null,
+    reelsSharePct: m.formats.find((f) => f.kind === "reel")?.pct ?? 0,
     topFormats: m.formats.slice(0, 3).map((f) => ({ label: f.label, pct: f.pct })),
     appealPoints: ins.appealPoints.slice(0, 6),
     tones: ins.tones.slice(0, 4),
@@ -168,6 +171,7 @@ function buildSystemInstruction(category: PersonaCategory): string {
     "참여율은 **규모(팔로워) 대비 등급**으로 판단하세요. 큰 계정은 참여율이 구조적으로 낮으니,",
     "절대 수치만 보고 '낮다'고 단정하지 말고 각 계정에 주어진 등급(활발/양호/평균/다소 낮음)을 존중하세요.",
     OBJECTIVITY_RULES,
+    PLAIN_LANGUAGE_RULE,
     "비교대상 **전원**이 공통으로 잘하는 점/부족한 점이 있으면 commonStrengths·commonWeaknesses 로 따로 뽑으세요.",
     "분석에서 끝내지 말고 **무엇을 더 시도해야 할지(구체 콘텐츠 아이디어·다음 액션)** 까지 제시하세요.",
     "모든 값은 한국어로, 지정된 JSON 스키마만 출력합니다(코드펜스·설명 금지).",
