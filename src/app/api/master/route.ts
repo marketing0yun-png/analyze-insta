@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isMaster } from "@/lib/server/master";
-import { USAGE_WINDOW_MS } from "@/lib/server/usage-meter";
+import { kstDayStartMs } from "@/lib/server/usage-meter";
 
 /** 전 사용자 조합 뷰는 service-role 필요 → Node 런타임. */
 export const runtime = "nodejs";
@@ -33,7 +33,7 @@ async function requireMaster() {
 
 /**
  * GET — 마스터 콘솔 집계(전 사용자 조합).
- * 사용자 수 / 사용량(2h·24h, action별) / 계정(종류별) / 개인토큰 수 /
+ * 사용자 수 / 사용량(오늘 KST·24h, action별) / 계정(종류별) / 개인토큰 수 /
  * 해시태그 신청(대기) / 큐레이션 목록.
  */
 export async function GET() {
@@ -46,7 +46,7 @@ export async function GET() {
   try {
     const now = Date.now();
     const since24h = new Date(now - DAY_MS).toISOString();
-    const window2hStart = now - USAGE_WINDOW_MS;
+    const todayStart = kstDayStartMs(now); // 미터 리셋 기준(KST 0시)과 동일
 
     const [
       usersRes,
@@ -79,20 +79,20 @@ export async function GET() {
         .limit(100),
     ]);
 
-    // 사용량 집계(action별 · 2h/24h).
-    const usage = { collect2h: 0, collect24h: 0, llm2h: 0, llm24h: 0 };
+    // 사용량 집계(action별 · 오늘 KST/24h).
+    const usage = { collectToday: 0, collect24h: 0, llmToday: 0, llm24h: 0 };
     for (const row of (usageRes.data ?? []) as Array<{
       action: string;
       created_at: string;
     }>) {
       const ts = Date.parse(row.created_at);
-      const within2h = ts >= window2hStart;
+      const withinToday = ts >= todayStart;
       if (row.action === "collect") {
         usage.collect24h += 1;
-        if (within2h) usage.collect2h += 1;
+        if (withinToday) usage.collectToday += 1;
       } else if (row.action === "llm") {
         usage.llm24h += 1;
-        if (within2h) usage.llm2h += 1;
+        if (withinToday) usage.llmToday += 1;
       }
     }
 

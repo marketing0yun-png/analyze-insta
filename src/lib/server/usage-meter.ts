@@ -3,14 +3,14 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * 사용량 미터 (Phase 3.5 · D-024) — "누가 얼마나 쓰나" 가로 레이어.
+ * 사용량 미터 (Phase 3.5 · D-024 / 일일 한도 전환 D-032 후속) — "누가 얼마나 쓰나" 가로 레이어.
  *
- * 두 개의 슬라이딩 윈도우 미터(둘 다 "최근 2시간 N회", 누적 없음):
+ * 두 개의 일일 미터(둘 다 "하루 N회", 테스트 기간 정책):
  *   ① collect — 수집·지표 묶음 (Meta·무료/오너 쿼터 보호). 실질 발동 = /collect.
  *               지표(/metrics) 조회는 무계측 — 새 데이터 받을 때(수집)만 소비.
  *   ② llm     — 분석·비교 묶음 (LLM·비용). /analyze + /compare 공용 풀.
  *
- * 슬라이딩 = 쓴 시각 기준 2시간 뒤 1칸 회복(예: 08:34 사용 → 10:34 회복).
+ * 리셋 = 매일 **한국시간(KST) 0시** 일괄 초기화(슬라이딩 아님 — 오늘 쓴 횟수만 센다).
  * 모든 함수는 service-role(admin) 클라이언트 필요 — usage_events 쓰기 정책 없음,
  * api_credentials 는 RLS 정책 자체가 없어 admin 만 접근 가능.
  */
@@ -21,11 +21,17 @@ export type UsageAction = "collect" | "llm";
 /** 티어. trial=개인 토큰 미등록(오너 토큰 체험) / personal=본인 토큰 등록. */
 export type UsageTier = "trial" | "personal";
 
-/** 윈도우 = 최근 2시간(ms). */
-export const USAGE_WINDOW_MS = 2 * 60 * 60 * 1000;
+export const DAY_MS = 24 * 60 * 60 * 1000;
+/** KST = UTC+9 (서머타임 없음). */
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+/** 오늘(KST) 0시의 epoch(ms) — 일일 윈도우 시작점. */
+export function kstDayStartMs(now: number = Date.now()): number {
+  return Math.floor((now + KST_OFFSET_MS) / DAY_MS) * DAY_MS - KST_OFFSET_MS;
+}
 
 /**
- * 액션×티어 한도. `null` = 무제한.
+ * 액션×티어 **하루** 한도(KST 0시 리셋). `null` = 무제한.
  *  - collect: 체험 10 / 개인 무제한 (개인은 본인 Meta 쿼터를 쓰므로 오너 보호 불필요).
  *  - llm:     두 티어 모두 10 공용 (LLM 실비용은 토큰과 무관하게 운영자 부담 → 안 풀림).
  */
@@ -72,13 +78,13 @@ export async function resolveTier(
 export type MeterStatus = {
   action: UsageAction;
   tier: UsageTier;
-  /** 윈도우당 한도. null = 무제한. */
+  /** 하루 한도. null = 무제한. */
   limit: number | null;
-  /** 최근 2시간 내 사용 횟수. */
+  /** 오늘(KST 0시 이후) 사용 횟수. */
   used: number;
   /** 남은 횟수. null = 무제한. */
   remaining: number | null;
-  /** 막혔을 때 1칸이 회복되는 시각(ISO). 여유 있거나 무제한이면 null. */
+  /** 막혔을 때 초기화 시각(다음 KST 0시, ISO). 여유 있거나 무제한이면 null. */
   resetAt: string | null;
   /** 지금 1회 쓸 수 있는지. */
   allowed: boolean;
@@ -110,33 +116,20 @@ export async function getMeterStatus(
     };
   }
 
-  const since = new Date(Date.now() - USAGE_WINDOW_MS).toISOString();
-  const { data, error } = await admin
+  // 오늘(KST 0시 이후) 사용분만 집계 — 막히면 다음 KST 0시에 일괄 초기화.
+  const dayStart = kstDayStartMs();
+  const { count, error } = await admin
     .from(USAGE)
-    .select("created_at")
+    .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
     .eq("action", action)
-    .gte("created_at", since)
-    .order("created_at", { ascending: true });
+    .gte("created_at", new Date(dayStart).toISOString());
   if (error) throw error;
 
-  const events = (data ?? []) as { created_at: string }[];
-  const used = events.length;
+  const used = count ?? 0;
   const remaining = Math.max(0, limit - used);
   const allowed = remaining > 0;
-
-  // 막혔으면: (used - limit) 번째로 오래된 사용이 2시간 지나면 1칸 회복.
-  //   used==limit → events[0](가장 오래된) + 2h. (방어적으로 초과분도 처리.)
-  let resetAt: string | null = null;
-  if (!allowed) {
-    const idx = used - limit; // >= 0
-    const target = events[idx];
-    if (target) {
-      resetAt = new Date(
-        Date.parse(target.created_at) + USAGE_WINDOW_MS
-      ).toISOString();
-    }
-  }
+  const resetAt = allowed ? null : new Date(dayStart + DAY_MS).toISOString();
 
   return { action, tier: resolvedTier, limit, used, remaining, resetAt, allowed };
 }
@@ -164,15 +157,8 @@ const ACTION_LABEL: Record<UsageAction, string> = {
  */
 export function meterBlockedMessage(status: MeterStatus): string {
   const label = ACTION_LABEL[status.action];
-  const when = status.resetAt
-    ? new Date(status.resetAt).toLocaleTimeString("ko-KR", {
-        timeZone: "Asia/Seoul",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : null;
-  const base = `${label} 횟수를 모두 썼어요 (2시간 ${status.limit}회).`;
-  const tail = when ? ` ${when}(KST)에 다시 가능합니다.` : "";
+  const base = `오늘 ${label} 횟수를 모두 썼어요 (하루 ${status.limit}회).`;
+  const tail = status.resetAt ? ` 한국시간 자정(0시)에 초기화됩니다.` : "";
   const hint =
     status.action === "collect" && status.tier === "trial"
       ? " 개인 토큰을 연결하면 수집 제한이 없어집니다."

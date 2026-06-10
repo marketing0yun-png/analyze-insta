@@ -145,7 +145,7 @@ export function UsageMeterCard() {
           </Badge>
         </div>
         <CardDescription>
-          최근 2시간 기준 슬라이딩 한도. 쓴 시각에서 2시간 뒤 한 칸씩 회복돼요.
+          하루 한도예요. 매일 한국시간 0시(자정)에 초기화돼요.
         </CardDescription>
       </CardHeader>
       <CardContent className="divide-border divide-y">

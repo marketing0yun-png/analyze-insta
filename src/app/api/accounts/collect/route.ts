@@ -157,7 +157,7 @@ export async function POST(req: Request) {
     }
 
     // 사용량 미터(D-024): 캐시 히트(위)는 Meta 를 안 부르므로 카운트 안 함 — 여기 도달한
-    // 실제 수집만 게이트·기록. 개인 토큰이면 collect 무제한이라 통과, 체험이면 2시간 10회.
+    // 실제 수집만 게이트·기록. 개인 토큰이면 collect 무제한이라 통과, 체험이면 하루 10회(KST 0시 리셋).
     const meter = await getMeterStatus(admin, user.id, "collect", tier);
     if (!meter.allowed) {
       return NextResponse.json(

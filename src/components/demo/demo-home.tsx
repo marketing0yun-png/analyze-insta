@@ -59,8 +59,8 @@ export function DemoHome() {
             <Badge variant="outline">체험(오너 토큰)</Badge>
           </div>
           <CardDescription>
-            최근 2시간 기준 슬라이딩 한도. 개인 토큰을 연결하면 수집·지표가
-            무제한이 돼요.
+            하루 한도(매일 한국시간 0시 초기화). 개인 토큰을 연결하면
+            수집·지표가 무제한이 돼요.
           </CardDescription>
         </CardHeader>
         <CardContent className="divide-border divide-y">

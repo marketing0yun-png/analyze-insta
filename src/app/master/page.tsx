@@ -27,9 +27,9 @@ import {
 import { Input } from "@/components/ui/input";
 
 type Usage = {
-  collect2h: number;
+  collectToday: number;
   collect24h: number;
-  llm2h: number;
+  llmToday: number;
   llm24h: number;
 };
 type Accounts = {
@@ -152,13 +152,13 @@ export default function MasterPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <Activity className="size-4" /> 사용량 (최근 2시간 / 24시간)
+                <Activity className="size-4" /> 사용량 (오늘 KST / 24시간)
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-              <Stat label="수집 2h" value={data.usage.collect2h} />
+              <Stat label="수집 오늘" value={data.usage.collectToday} />
               <Stat label="수집 24h" value={data.usage.collect24h} />
-              <Stat label="분석·비교 2h" value={data.usage.llm2h} />
+              <Stat label="분석·비교 오늘" value={data.usage.llmToday} />
               <Stat label="분석·비교 24h" value={data.usage.llm24h} />
             </CardContent>
           </Card>

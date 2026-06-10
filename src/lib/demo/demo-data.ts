@@ -46,11 +46,11 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [
   },
 ];
 
-/** 홈 사용량 미터 미리보기용 목업(체험 티어 예시). */
+/** 홈 사용량 미터 미리보기용 목업(체험 티어 예시 — 하루 한도, KST 0시 리셋). */
 export const DEMO_USAGE = {
   tier: "trial" as const,
-  collect: { remaining: 3, limit: 5 },
-  llm: { remaining: 4, limit: 5 },
+  collect: { remaining: 7, limit: 10 },
+  llm: { remaining: 8, limit: 10 },
 };
 
 /** 시간대(0~23) 게시 빈도 — 저녁 시간대(20~22시)에 몰린 패턴. */
