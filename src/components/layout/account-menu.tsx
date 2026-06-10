@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { Loader2, LogIn, LogOut, UserCircle, X } from "lucide-react";
+import { CircleAlert, Loader2, LogIn, LogOut, UserCircle, X } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { useCredentials } from "@/components/credentials/credentials-provider";
@@ -60,12 +60,6 @@ export function AccountMenu() {
     );
   }
 
-  const dotClass = credLoading
-    ? "bg-muted-foreground animate-pulse"
-    : connected
-      ? "bg-emerald-500"
-      : "bg-amber-500";
-
   return (
     <>
       <button
@@ -76,9 +70,14 @@ export function AccountMenu() {
         className="border-input bg-background/60 hover:bg-muted relative inline-flex size-9 items-center justify-center rounded-full border transition-colors"
       >
         <UserCircle className="size-5" />
-        <span
-          className={`ring-background absolute top-0 right-0 size-2.5 rounded-full ring-2 ${dotClass}`}
-        />
+        {credLoading ? (
+          <span className="ring-background bg-muted-foreground absolute top-0 right-0 size-2.5 animate-pulse rounded-full ring-2" />
+        ) : connected ? (
+          <span className="ring-background absolute top-0 right-0 size-2.5 rounded-full bg-emerald-500 ring-2" />
+        ) : (
+          // 미연결 = 점 대신 주의(!) 표시 — 뭔가 해야 함을 알려 눌러보게(사용자 피드백)
+          <CircleAlert className="ring-background absolute -top-1 -right-1 size-4 rounded-full fill-amber-500 text-white ring-2" />
+        )}
       </button>
 
       {/* 헤더의 backdrop-blur 가 fixed 의 기준(containing block)이 되므로

@@ -12,9 +12,10 @@ export default function Home() {
         <Badge className="bg-gradient-brand mb-5 gap-1.5 border-0 px-3 py-1 text-white shadow-sm">
           <Sparkles className="size-3.5" /> 육아·출산 인스타 트렌드·경쟁 분석
         </Badge>
-        <h1 className="text-3xl font-bold tracking-tight text-balance sm:text-5xl">
+        {/* 모바일 포함 항상 강제 줄바꿈 — 자연 줄바꿈으로 "한눈에"가 찢어지는 것 방지 */}
+        <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">
           경쟁사 인스타를
-          <br className="hidden sm:block" />{" "}
+          <br />
           <span className="text-gradient-brand">한눈에</span> 분석하세요
         </h1>
         <p className="text-muted-foreground mt-4 max-w-xl text-base text-pretty sm:text-lg">
