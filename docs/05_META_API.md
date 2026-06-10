@@ -15,6 +15,12 @@
 3. `GET /{page-id}?fields=instagram_business_account` → **ig_user_id** 획득 (모든 호출의 열쇠)
 4. 단기 토큰 → **장기 토큰(~60일)** 교환, 만료 전 갱신.
 
+> **발급 UI 경로 3가지** (셋업 절차는 `docs/11_GUIDE_META.md`):
+> ① **수동** — 그래프 API 탐색기에서 발급 후 붙여넣기 (STEP 7, 현행)
+> ② **OAuth 버튼** — Facebook Login for Business `config_id` 다이얼로그 → 콜백에서 code 교환 (STEP 11, **Meta측 셋업 완료·코드 미착수 D-031**)
+> ③ **오너 토큰** — 무기한 System User 토큰, 체험계정 공유용 (STEP 10)
+> ※ 신형 *Instagram API with Instagram Login* 은 Business Discovery·해시태그 검색 미지원 → **기각**(D-031).
+
 ## 2. 핵심 엔드포인트
 
 ### (A) 외부 계정 공개지표 — Business Discovery  [Phase 1]

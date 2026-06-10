@@ -242,6 +242,98 @@ me/accounts?fields=name,instagram_business_account{id,username}
 
 ---
 
+## STEP 11. (사용자 간편 발급) OAuth 버튼 토큰 발급 — Facebook Login for Business ⭐
+> **용도:** STEP 7(탐색기 수동 발급)을 대체할 일반 사용자용 간편 발급(D-031).
+> 사용자는 **"Facebook으로 연결" 버튼 → 페북 로그인/동의 → 끝.** 서버가 자동으로 장기 토큰 교환·암호화 저장.
+> **Meta 대시보드 셋업(11-1~11-3)은 2026-06-10 완료. 11-4에서 중단, 코드(11-5)는 미착수.**
+
+### 진행 체크리스트 (2026-06-10 기준)
+- [x] **11-1** 제품 추가 (비즈니스용 Facebook 로그인)
+- [x] **11-2** 로그인 구성 생성 → `config_id` 발급 + `.env.local` 반영
+- [x] **11-3** 설정 (OAuth 토글 + 리디렉션 URI)
+- [ ] **11-4** `public_profile` 고급 액세스 (개인정보처리방침 URL 등록 선행) ← **재개 지점**
+- [ ] **11-5** 코드 구현 (라우트 2개 + 버튼)
+- [ ] **11-6** 테스터 등록 (시범 사용자용)
+- [ ] **11-7** Vercel 환경변수 + Redeploy
+
+### 11-1. 제품 추가 ✅
+앱 대시보드([developers.facebook.com](https://developers.facebook.com) → `test_분석용앱`, 앱 ID `2942222376119807`)
+→ "내 제품"에 **비즈니스용 Facebook 로그인** 추가됨(Instagram 제품과 나란히 표시되면 OK).
+
+### 11-2. 로그인 구성(Configuration) ✅
+**비즈니스용 Facebook 로그인 → 구성 → 구성 만들기** 마법사:
+
+| 단계 | 선택값 |
+|---|---|
+| 로그인 버전 | **Instagram 그래프 API** (General ❌ — 생성 후 변경 불가, 잘못 골랐으면 구성 삭제 후 재생성) |
+| 액세스 토큰 | **사용자 액세스 토큰** (System-user ❌ — 그건 오너 토큰용 STEP 10) |
+| 권한 (5개) | `instagram_basic`, `pages_show_list`, `pages_read_engagement`, `business_management`, `instagram_manage_insights` |
+
+발급된 **구성 ID(config_id)** — 시크릿 아님(OAuth URL에 공개 노출되는 값):
+```
+1407928874437388
+```
+- `.env.local` 에 `META_LOGIN_CONFIG_ID=1407928874437388` **반영 완료**.
+
+### 11-3. 설정(Settings) ✅
+**비즈니스용 Facebook 로그인 → 설정**:
+- 클라이언트 OAuth 로그인 **예** · 웹 OAuth 로그인 **예** · HTTPS 적용 **예** · 리디렉션 URI Strict 모드 **예**
+- 웹 OAuth 재인증 · 포함(embed)된 브라우저 · 기기에서 로그인 · JavaScript SDK 로그인 = 전부 **아니요**
+- **유효한 OAuth 리디렉션 URI** 등록값:
+```
+https://analyze-insta.vercel.app/api/meta/oauth/callback
+```
+- localhost 는 **개발 모드에서 등록 없이 자동 허용**(이 칸은 https 만 입력 가능하므로 넣지 않는다).
+
+### 11-4. `public_profile` 고급 액세스 🔲 ← 재개 지점
+설정 화면 상단 노란 배너: *"Facebook Login for Business 사용에는 public_profile 고급 액세스 필요."*
+**클릭 한 번짜리 전환이며 앱 검수(심사 제출)와 다르다.** 단, **개인정보처리방침 URL 등록이 선행 조건**
+(미등록 시 "개인정보처리방침 URL 오류" 팝업으로 거부됨 — 실측 2026-06-10).
+
+1. **앱 설정 → 기본** 에서 입력 후 **변경 내용 저장**:
+   - 개인정보처리방침 URL: `https://analyze-insta.vercel.app/privacy` (D-026 때 배포됨, 200 확인)
+   - 서비스 약관 URL: `https://analyze-insta.vercel.app/terms` (선택이지만 권장)
+   - 사용자 데이터 삭제: **"데이터 삭제 안내 URL"** 선택 → `https://analyze-insta.vercel.app/privacy`
+   - 카테고리(요구 시): **비즈니스 및 페이지**
+2. **앱 검수 → 권한 및 기능** → `public_profile` 검색 → **"고급 액세스 요청"** 클릭.
+3. ⚠️ 비즈니스 인증 등 **추가 요구가 뜨면 진행 중단**하고 화면 캡처 후 상의.
+
+### 11-5. 코드 구현 계획 🔲 (라우트 2개 + 버튼)
+- env: `META_LOGIN_CONFIG_ID`(반영 완료) + 기존 `META_APP_ID`/`META_APP_SECRET` — `env.ts`에 getter 추가.
+- **`GET /api/meta/oauth/start`**: 로그인 세션 확인 → `state` 난수 생성(httpOnly 쿠키 보관) → 아래로 redirect:
+```
+https://www.facebook.com/v23.0/dialog/oauth
+  ?client_id=<META_APP_ID>
+  &config_id=<META_LOGIN_CONFIG_ID>
+  &redirect_uri=<origin>/api/meta/oauth/callback
+  &state=<난수>
+  &response_type=code
+```
+- **`GET /api/meta/oauth/callback`**: `state` 쿠키 대조 → `code` 수신(10분 1회용) →
+  `GET /oauth/access_token?client_id&client_secret&redirect_uri&code` 로 단기 토큰 교환 →
+  기존 `exchangeLongLivedToken()`(`lib/meta/client.ts`, ~60일) → **기존 토큰 검증·암호화 저장 파이프라인 재사용** → 홈으로 redirect.
+- `ConnectCard`에 **"Facebook으로 연결"** 버튼 추가 (수동 붙여넣기 입력은 폴백으로 유지).
+- `redirect_uri` 는 요청 origin 기반으로 구성(localhost/프로덕션 겸용). **Strict 모드 = 등록 URI와 글자 단위 일치 필수.**
+
+### 11-6. 테스터 등록 🔲
+검수 전에는 **앱 역할 등록 계정만** OAuth 가능. **앱 역할 → 역할 → 테스터 추가**(시범 사용자의 페이스북 계정).
+운영자 본인(관리자)은 등록 불필요. 불특정 다수 공개는 앱 검수(Advanced Access) 통과 후.
+
+### 11-7. Vercel 환경변수 🔲
+Vercel → 프로젝트 → Settings → Environment Variables:
+```
+META_APP_ID
+META_APP_SECRET
+META_LOGIN_CONFIG_ID=1407928874437388
+```
+저장 후 **Redeploy** (로컬 `.env.local` 은 로컬 전용).
+
+> **(참고) Instagram API with Instagram Login(신형, 페이스북 페이지 불필요)은 기각** —
+> 발급은 더 간편하나 **Business Discovery·해시태그 검색 미지원**이라 본 서비스 핵심(외부 계정 분석)이 동작 안 함.
+> **Facebook Login for Business 고정.** (신형도 비즈니스/크리에이터 계정 전용인 건 동일)
+
+---
+
 ## 트러블슈팅
 | 증상 | 원인 | 해결 |
 |---|---|---|
@@ -253,6 +345,8 @@ me/accounts?fields=name,instagram_business_account{id,username}
 | 권한 거부/검수 요구 | 일반 공개 모드 + Advanced Access 미승인 | 개발 모드 + 테스터 등록(STEP 6)으로 진행 |
 | `me/accounts` 가 비어있음 | 관리 페이지 없음 / 페이지-IG 미연결 | STEP 2·4 |
 | 외부 계정 조회 시 빈 값 | 상대가 개인 계정(비프로페셔널) | Business Discovery 불가 — 분석 대상에서 제외 |
+| "고급 액세스 요청" 클릭 시 **개인정보처리방침 URL 오류** 팝업 | 앱 기본 정보에 방침 URL 미등록 | **STEP 11-4 ①** (앱 설정→기본에 `/privacy` 등록·저장) 후 재시도 |
+| OAuth 다이얼로그가 `redirect_uri` 불일치 거부 | Strict 모드에서 등록 URI와 글자 단위 다름 | STEP 11-3 등록값과 호출값 일치 확인(트레일링 슬래시 포함) |
 
 ## 보안 원칙 (요약 — `docs/06_AUTH_SECURITY.md`)
 - 토큰은 **서버에서만** 처리, **AES-256-GCM 암호화** 저장, 프론트로 절대 안 보냄.
